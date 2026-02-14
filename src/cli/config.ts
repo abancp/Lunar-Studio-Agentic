@@ -12,6 +12,7 @@ interface ConfigSchema {
         antigravity?: string;
     };
     provider?: 'openai' | 'google' | 'antigravity';
+    workspace?: string;
 }
 
 const config = new Conf<ConfigSchema>({
@@ -19,6 +20,7 @@ const config = new Conf<ConfigSchema>({
     defaults: {
         apiKeys: {},
         defaultModels: {},
+        workspace: process.env.HOME ? `${process.env.HOME}/lunarstudio/.workspace` : './workspace',
     },
 });
 
@@ -46,6 +48,14 @@ export const getDefaultModel = (provider: Provider): string | undefined => {
 
 export const setDefaultModel = (provider: Provider, model: string): void => {
     config.set(`defaultModels.${provider}`, model);
+};
+
+export const getWorkspace = (): string => {
+    return config.get('workspace') || './workspace';
+};
+
+export const setWorkspace = (path: string): void => {
+    config.set('workspace', path);
 };
 
 export const clearConfig = (): void => {

@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { LLMProvider, Tool } from './types.js';
+import { LLMProvider, Tool, Message, MessageRole } from './types.js';
 import { zodResponseFormat } from 'openai/helpers/zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
@@ -12,10 +12,18 @@ export class OpenAIProvider implements LLMProvider {
         this.model = model;
     }
 
-    async generate(prompt: string, tools?: Tool[]): Promise<string> {
+    async generate(messages: Message[], tools?: Tool[]): Promise<Message> {
+        const openaiMessages: any[] = messages.map(m => ({
+            role: m.role,
+            content: m.content,
+            tool_calls: m.tool_calls,
+            tool_call_id: m.tool_call_id,
+            name: m.name
+        }));
+
         const response = await this.client.chat.completions.create({
             model: this.model,
-            messages: [{ role: 'user', content: prompt }],
+            messages: openaiMessages,
             tools: tools?.map((tool) => ({
                 type: 'function',
                 function: {
@@ -27,26 +35,41 @@ export class OpenAIProvider implements LLMProvider {
         });
 
         const choice = response.choices[0];
-        if (!choice) return "No response generated.";
+        if (!choice) return { role: 'assistant', content: "No response generated." };
 
-        const content = choice.message.content;
-        if (content) return content;
+        const msg = choice.message;
 
-        // Check for tool calls
-        const toolCalls = choice.message.tool_calls;
-        if (toolCalls && toolCalls.length > 0) {
-            // For simplicity in this iteration, we return a JSON string describing the tool call
-            // In a real application, we would execute the tool here or return a specific structure
-            return JSON.stringify({ tool_calls: toolCalls });
+        const result: Message = {
+            role: 'assistant',
+            content: msg.content,
+        };
+
+        if (msg.tool_calls) {
+            result.tool_calls = msg.tool_calls.map((tc: any) => ({
+                id: tc.id,
+                type: 'function',
+                function: {
+                    name: tc.function.name,
+                    arguments: tc.function.arguments,
+                }
+            }));
         }
 
-        return "No content generated.";
+        return result;
     }
 
-    async *stream(prompt: string, tools?: Tool[]): AsyncGenerator<string> {
+    async *stream(messages: Message[], tools?: Tool[]): AsyncGenerator<string> {
+        const openaiMessages: any[] = messages.map(m => ({
+            role: m.role,
+            content: m.content,
+            tool_calls: m.tool_calls,
+            tool_call_id: m.tool_call_id,
+            name: m.name
+        }));
+
         const stream = await this.client.chat.completions.create({
             model: this.model,
-            messages: [{ role: 'user', content: prompt }],
+            messages: openaiMessages,
             stream: true,
             tools: tools?.map((tool) => ({
                 type: 'function',

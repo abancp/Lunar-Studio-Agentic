@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { Tool } from '../llm/types.js';
+import { workspaceTools } from './workspace.js';
 
 export const tools: Tool[] = [
+    ...workspaceTools,
     {
         name: 'calculator',
         description: 'Perform simple calculations',
