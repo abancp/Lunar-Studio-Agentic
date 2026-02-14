@@ -26,4 +26,12 @@ program
     .description('List available models for the configured provider')
     .action(listModelsCommand);
 
+program
+    .command('daemon')
+    .description('Start the long-running agent daemon (WhatsApp, etc.)')
+    .action(async () => {
+        const { startDaemon } = await import('../index.js');
+        await startDaemon();
+    });
+
 program.parse(process.argv);

@@ -13,6 +13,10 @@ interface ConfigSchema {
     };
     provider?: 'openai' | 'google' | 'antigravity';
     workspace?: string;
+    whatsapp?: {
+        enabled: boolean;
+        allowedNumbers?: string[]; // E.g., '1234567890@c.us'
+    };
 }
 
 const config = new Conf<ConfigSchema>({
@@ -56,6 +60,14 @@ export const getWorkspace = (): string => {
 
 export const setWorkspace = (path: string): void => {
     config.set('workspace', path);
+};
+
+export const getWhatsAppConfig = () => {
+    return config.get('whatsapp');
+};
+
+export const setWhatsAppConfig = (enabled: boolean, allowedNumbers?: string[]) => {
+    config.set('whatsapp', { enabled, allowedNumbers });
 };
 
 export const clearConfig = (): void => {
