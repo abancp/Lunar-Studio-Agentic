@@ -33,6 +33,10 @@ export const workspaceTools: Tool[] = [
                     return "Error: Navigation outside workspace (..) is not allowed for safety.";
                 }
 
+                if (command.includes('rm')) {
+                    return "cant remove a file , protected"
+                }
+
                 const { stdout, stderr } = await execAsync(command, { cwd });
                 if (stderr) {
                     return `Output:\n${stdout}\nErrors:\n${stderr}`;

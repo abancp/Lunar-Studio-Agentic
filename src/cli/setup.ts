@@ -8,6 +8,8 @@ interface SetupAnswers {
     model: string;
 }
 
+import { createLLM } from '../../llm/factory.js';
+
 export async function setupCommand() {
     console.log(chalk.bold.blue('Welcome to LLM Engine Setup'));
 
@@ -17,7 +19,7 @@ export async function setupCommand() {
             type: 'list',
             name: 'provider',
             message: 'Select your default LLM provider:',
-            choices: ['openai', 'google', 'antigravity'],
+            choices: ['openai', 'google', 'groq', 'antigravity'],
             default: config.getProvider() || 'google',
         }
     ]);
@@ -25,40 +27,91 @@ export async function setupCommand() {
     // Step 2: Configure selected provider
     console.log(chalk.blue(`Configuring ${provider}...`));
 
-    const providerConfig = await inquirer.prompt([
+    const { apiKey } = await inquirer.prompt([
         {
             type: 'password',
             name: 'apiKey',
             message: `Enter your ${provider} API Key:`,
             default: config.getApiKey(provider),
             validate: (input: string) => input.trim().length > 0 || 'API Key is required.',
-        },
-        {
-            type: 'input',
-            name: 'model',
-            message: `Enter default model for ${provider} (optional):`,
-            default: config.getDefaultModel(provider) || (provider === 'openai' ? 'gpt-4o' : provider === 'google' ? 'gemini-1.5-flash' : 'ag-model-1'),
         }
     ]);
 
-    // Step 3: Save configuration
+    // Step 3: Fetch Models (Dynamic)
+    let model = config.getDefaultModel(provider);
+    let models: string[] = [];
+
+    // Default fallback models
+    const defaultModels: Record<string, string> = {
+        openai: 'gpt-4o',
+        google: 'gemini-1.5-flash',
+        groq: 'llama3-70b-8192',
+        antigravity: 'ag-model-1'
+    };
+
+    console.log(chalk.yellow(`Attempting to fetch available models for ${provider}...`));
+    try {
+        const llm = createLLM(provider, apiKey);
+        if (llm.listModels) {
+            models = await llm.listModels();
+        }
+    } catch (e: any) {
+        console.error(chalk.red(`Failed to fetch models: ${e.message}`));
+        console.log(chalk.dim('Falling back to manual model entry.'));
+    }
+
+    if (models.length > 0) {
+        const { selectedModel } = await inquirer.prompt([
+            {
+                type: 'list',
+                name: 'selectedModel',
+                message: `Select default model for ${provider}:`,
+                choices: models,
+                default: model && models.includes(model) ? model : defaultModels[provider] || models[0],
+            }
+        ]);
+        model = selectedModel;
+    } else {
+        const { manualModel } = await inquirer.prompt([
+            {
+                type: 'input',
+                name: 'manualModel',
+                message: `Enter default model for ${provider}:`,
+                default: model || defaultModels[provider],
+            }
+        ]);
+        model = manualModel;
+    }
+
+    // Step 4: Save configuration
     config.setProvider(provider);
-    config.setApiKey(provider, providerConfig.apiKey);
-    config.setDefaultModel(provider, providerConfig.model);
+    config.setApiKey(provider, apiKey);
+    if (model) {
+        config.setDefaultModel(provider, model);
+    }
 
     console.log(chalk.green('✔ Configuration saved successfully!'));
     console.log(chalk.dim(`Provider: ${provider}`));
-    console.log(chalk.dim(`Model: ${providerConfig.model}`));
+    console.log(chalk.dim(`Model: ${model}`));
 
     // Step 4: WhatsApp Setup
+    const waConfig = config.getWhatsAppConfig();
+    const isWaSetup = waConfig && waConfig.enabled;
+
     const { setupWhatsApp } = await inquirer.prompt([
         {
             type: 'confirm',
             name: 'setupWhatsApp',
-            message: 'Do you want to setup WhatsApp integration now? (Requires scanning QR code)',
+            message: isWaSetup
+                ? 'WhatsApp is already configured. Do you want to re-configure it? (Existing config will be overwritten)'
+                : 'Do you want to setup WhatsApp integration now? (Requires scanning QR code)',
             default: false,
         }
     ]);
+
+    if (!setupWhatsApp && isWaSetup) {
+        console.log(chalk.dim('Keeping existing WhatsApp configuration.'));
+    }
 
     if (setupWhatsApp) {
         console.log(chalk.blue('Starting WhatsApp Setup...'));
@@ -67,6 +120,7 @@ export async function setupCommand() {
                 type: 'input',
                 name: 'allowedNumbersInput',
                 message: 'Enter allowed phone numbers (comma separated, e.g., 1234567890@c.us, 9876543210@c.us). Leave empty to allow ALL (Not recommended):',
+                default: isWaSetup && waConfig?.allowedNumbers ? waConfig.allowedNumbers.join(',') : undefined,
             }
         ]);
 

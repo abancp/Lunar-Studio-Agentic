@@ -2,7 +2,7 @@ import { workspaceTools } from '../../tools/workspace.js';
 import * as config from './config.js';
 import fs from 'fs';
 import path from 'path';
-import { createLLM } from '../llm/factory.js'; // Ensure correct path
+import { createLLM } from '../../llm/factory.js'; // Ensure correct path
 // Mocking LLM for tool verification or just testing tools directly
 
 async function verify() {

@@ -5,13 +5,15 @@ interface ConfigSchema {
         openai?: string;
         google?: string;
         antigravity?: string;
+        groq?: string;
     };
     defaultModels: {
         openai?: string;
         google?: string;
         antigravity?: string;
+        groq?: string;
     };
-    provider?: 'openai' | 'google' | 'antigravity';
+    provider?: 'openai' | 'google' | 'antigravity' | 'groq';
     workspace?: string;
     whatsapp?: {
         enabled: boolean;
@@ -28,7 +30,7 @@ const config = new Conf<ConfigSchema>({
     },
 });
 
-export type Provider = 'openai' | 'google' | 'antigravity';
+export type Provider = 'openai' | 'google' | 'antigravity' | 'groq';
 
 export const getApiKey = (provider: Provider): string | undefined => {
     return config.get(`apiKeys.${provider}`);

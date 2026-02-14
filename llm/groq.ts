@@ -2,16 +2,16 @@ import OpenAI from 'openai';
 import { LLMProvider, Tool, Message } from './types.js';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 
-export class AntigravityProvider implements LLMProvider {
+export class GroqProvider implements LLMProvider {
     private client: OpenAI;
-    private modelName: string;
+    private model: string;
 
-    constructor(apiKey: string, modelName: string = 'ag-model-1') {
+    constructor(apiKey: string, model: string = 'llama3-70b-8192') {
         this.client = new OpenAI({
-            apiKey: apiKey,
-            // baseURL: 'https://api.antigravity.ai/v1', // Example
+            apiKey,
+            baseURL: 'https://api.groq.com/openai/v1',
         });
-        this.modelName = modelName;
+        this.model = model;
     }
 
     async generate(messages: Message[], tools?: Tool[]): Promise<Message> {
@@ -24,7 +24,7 @@ export class AntigravityProvider implements LLMProvider {
         }));
 
         const response = await this.client.chat.completions.create({
-            model: this.modelName,
+            model: this.model,
             messages: openaiMessages,
             // Groq supports tools, but let's double check if we need special handling. 
             // Standard OpenAI format should work.
@@ -72,7 +72,7 @@ export class AntigravityProvider implements LLMProvider {
         }));
 
         const stream = await this.client.chat.completions.create({
-            model: this.modelName,
+            model: this.model,
             messages: openaiMessages,
             stream: true,
             tools: tools?.map((tool) => ({
@@ -93,8 +93,8 @@ export class AntigravityProvider implements LLMProvider {
     }
 
     async listModels(): Promise<string[]> {
-        // Placeholder for fetching models from Antigravity API
-        // if (this.oauthToken) { ... fetch from api ... }
-        return ['ag-model-1', 'ag-model-2-beta', 'ag-r1-reasoning'];
+        const models = await this.client.models.list();
+        // Filter for relevant models if needed, or just return all
+        return models.data.map(m => m.id);
     }
 }
