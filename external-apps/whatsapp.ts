@@ -17,10 +17,14 @@ export class WhatsAppService {
     private enabled: boolean = false;
     private allowedNumbers: Set<string> = new Set();
     private historyManagers: Map<string, HistoryManager> = new Map(); // Chat ID -> HistoryManager
+    private startTime: number;
+    private hotword?: string;
 
     constructor() {
+        this.startTime = Math.floor(Date.now() / 1000); // Current time in seconds
         const conf = config.getWhatsAppConfig();
         this.enabled = conf?.enabled || false;
+        this.hotword = conf?.hotword;
 
         if (conf?.allowedNumbers) {
             conf.allowedNumbers.forEach(n => this.allowedNumbers.add(n));
@@ -90,6 +94,26 @@ export class WhatsAppService {
     }
 
     private async handleMessage(msg: WAMessage) {
+        // Filter out old messages
+        let messageTs = msg.timestamp;
+
+        if (typeof messageTs === 'number') {
+            // Heuristic to detect if timestamp is in milliseconds
+            // If TS > 10^11 (100 billion), it's likely milliseconds (1.7 trillion for 2024)
+            // If TS < 10^11, it's likely seconds (1.7 billion for 2024)
+            if (messageTs > 100000000000) {
+                messageTs = Math.floor(messageTs / 1000);
+            }
+
+            // Now messageTs is standard unix timestamp in seconds
+            if (messageTs < this.startTime) {
+                logger.warn(`Ignoring old message from ${msg.from} (ts: ${messageTs}, start: ${this.startTime})`);
+                return;
+            }
+        } else {
+            logger.warn(`Message from ${msg.from} has no valid timestamp (${msg.timestamp}). Processing anyway.`);
+        }
+
         const chatId = msg.from; // e.g., '12345@c.us'
 
         // Access Control
@@ -99,6 +123,11 @@ export class WhatsAppService {
         // If allowedNumbers has entries, check it.
         if (this.allowedNumbers.size > 0 && !this.allowedNumbers.has(chatId)) {
             logger.warn(`Blocked message from unauthorized number: ${chatId}`);
+            return;
+        }
+
+        if (!msg.body.startsWith(this.hotword)) {
+            logger.info(`Message from ${chatId} does not start with hotword. Ignoring.`);
             return;
         }
 

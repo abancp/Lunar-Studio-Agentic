@@ -18,6 +18,7 @@ interface ConfigSchema {
     whatsapp?: {
         enabled: boolean;
         allowedNumbers?: string[]; // E.g., '1234567890@c.us'
+        hotword?: string;
     };
 }
 
