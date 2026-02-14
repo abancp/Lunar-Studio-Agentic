@@ -46,8 +46,9 @@ export class HistoryManager {
 
     addSystemMessage(content: string) {
         // If first message is system, replace it, otherwise unshift
-        if (this.history.length > 0 && this.history[0].role === 'system') {
-            this.history[0].content = content;
+        if (this.history.length > 0 && this.history[0]?.role === 'system') {
+            const firstMsg = this.history[0];
+            if (firstMsg) firstMsg.content = content;
         } else {
             this.history.unshift({ role: 'system', content });
         }
@@ -67,7 +68,7 @@ export class HistoryManager {
 
     clear() {
         // preserve system prompt if exists
-        const system = this.history.length > 0 && this.history[0].role === 'system' ? this.history[0] : null;
+        const system = this.history.length > 0 && this.history[0]?.role === 'system' ? this.history[0] : null;
         this.history = [];
         if (system) {
             this.history.push(system);

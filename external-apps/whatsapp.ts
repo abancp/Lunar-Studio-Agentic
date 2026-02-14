@@ -8,8 +8,12 @@ import { HistoryManager } from '../src/cli/history.js';
 import { AGENTIC_SYSTEM_PROMPT } from '../llm/system.js';
 import { tools } from '../tools/index.js';
 
+// Define minimal interface for what we use if we can't import types easily from pkg
+// or just use any for simplicity in this context given the complex import of whatsapp-web.js
+type WAMessage = any;
+
 export class WhatsAppService {
-    private client: Client;
+    private client: any; // Client type is hard to import from the CommonJS export style of whatsapp-web.js in ESM
     private enabled: boolean = false;
     private allowedNumbers: Set<string> = new Set();
     private historyManagers: Map<string, HistoryManager> = new Map(); // Chat ID -> HistoryManager
@@ -35,7 +39,7 @@ export class WhatsAppService {
     }
 
     private registerEvents() {
-        this.client.on('qr', (qr) => {
+        this.client.on('qr', (qr: string) => {
             logger.info('QR Code received. Scan it to login.');
             console.log('\nScan this QR code with WhatsApp:\n');
             qrcode.generate(qr, { small: true });
@@ -50,11 +54,11 @@ export class WhatsAppService {
             logger.info('WhatsApp authenticated.');
         });
 
-        this.client.on('auth_failure', (msg) => {
+        this.client.on('auth_failure', (msg: string) => {
             logger.error(`WhatsApp auth failure: ${msg}`);
         });
 
-        this.client.on('message_create', async (msg) => {
+        this.client.on('message_create', async (msg: WAMessage) => {
             // message_create fires for all messages (including own). 
             // We usually want 'message' event for received, but 'message_create' allows testing with self if needed.
             // But strict bot logic should use 'message'. 

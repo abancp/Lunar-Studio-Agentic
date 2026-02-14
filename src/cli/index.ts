@@ -7,8 +7,8 @@ import { listModelsCommand } from './list-models.js';
 const program = new Command();
 
 program
-    .name('llm-engine')
-    .description('LLI Engine CLI with MCP Support')
+    .name('lunarstudio')
+    .description('Lunar Studio CLI ')
     .version('1.0.0');
 
 program

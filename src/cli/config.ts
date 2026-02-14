@@ -22,7 +22,7 @@ interface ConfigSchema {
 }
 
 const config = new Conf<ConfigSchema>({
-    projectName: 'llm-engine-cli',
+    projectName: 'lunarstudio',
     defaults: {
         apiKeys: {},
         defaultModels: {},
