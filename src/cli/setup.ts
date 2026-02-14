@@ -27,7 +27,6 @@ export async function setupCommand() {
     // -----------------------------
     const apiKey = await password({
         message: `Enter your ${provider} API Key:`,
-        default: config.getApiKey(provider) || undefined,
         validate: (input) =>
             input.trim().length > 0 ? true : 'API Key is required.',
     });
@@ -146,5 +145,5 @@ export async function setupCommand() {
         }
     }
 
-    console.log(chalk.green('Setup complete.\n'));
+    console.log(chalk.green('Setup complete.\n')); 2
 }
