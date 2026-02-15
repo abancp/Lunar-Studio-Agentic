@@ -12,6 +12,10 @@ import { tools } from '../tools/index.js';
 // or just use any for simplicity in this context given the complex import of whatsapp-web.js
 type WAMessage = any;
 
+const AI_START_COMMAND = "@ai_start"
+const AI_STOP_COMMAND = "@ai_stop"
+const TO_AI_COMMAND = "@ai"
+
 export class WhatsAppService {
     private client: any; // Client type is hard to import from the CommonJS export style of whatsapp-web.js in ESM
     private enabled: boolean = false;
@@ -19,6 +23,7 @@ export class WhatsAppService {
     private historyManagers: Map<string, HistoryManager> = new Map(); // Chat ID -> HistoryManager
     private startTime: number;
     private hotword?: string;
+    private aiEnabledNumbers: Record<string, boolean> = {};
 
     constructor() {
         this.startTime = Math.floor(Date.now() / 1000); // Current time in seconds
@@ -114,7 +119,7 @@ export class WhatsAppService {
             logger.warn(`Message from ${msg.from} has no valid timestamp (${msg.timestamp}). Processing anyway.`);
         }
 
-        const chatId = msg.from; // e.g., '12345@c.us'
+        const chatId = msg.from as string; // e.g., '12345@c.us'
 
         // Access Control
         // If allowedNumbers is empty, we might default to allow none, or allow all? 
@@ -126,10 +131,27 @@ export class WhatsAppService {
             return;
         }
 
+        if (msg.body.startsWith(AI_START_COMMAND)) {
+            this.aiEnabledNumbers[chatId] = true;
+            logger.info(`Ai chat started with ${chatId}`);
+            return;
+        }
+
+        if (msg.body.startsWith(AI_STOP_COMMAND)) {
+            this.aiEnabledNumbers[chatId] = false;
+            logger.info(`Ai chat stopped with ${chatId}`);
+            return;
+        }
+        if (!this.aiEnabledNumbers[chatId]) {
+            logger.info(`Ai chat not enabled for ${chatId}. Ignoring.`);
+            return;
+        }
+
         if (!msg.body.startsWith(this.hotword)) {
             logger.info(`Message from ${chatId} does not start with hotword. Ignoring.`);
             return;
         }
+
 
         logger.info(`Received WhatsApp message from ${chatId}: ${msg.body}`);
 
