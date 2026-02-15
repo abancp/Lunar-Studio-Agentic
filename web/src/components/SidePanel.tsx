@@ -15,7 +15,9 @@ import {
     Clock,
     Star,
     Sparkles,
+    Terminal,
 } from 'lucide-react';
+import type { AgentStatus } from '../hooks/useWebSocket';
 
 interface NavItem {
     icon: React.ElementType;
@@ -24,38 +26,32 @@ interface NavItem {
     active?: boolean;
 }
 
-interface ToolItem {
-    icon: React.ElementType;
-    name: string;
-    status: 'active' | 'idle';
-}
-
 const navItems: NavItem[] = [
     { icon: MessageSquare, label: 'Chat', active: true },
-    { icon: Brain, label: 'Memory', badge: '24' },
+    { icon: Brain, label: 'Memory' },
     { icon: Wrench, label: 'Tools' },
     { icon: ScrollText, label: 'Logs' },
     { icon: Smartphone, label: 'Apps' },
 ];
 
-const tools: ToolItem[] = [
-    { icon: Calculator, name: 'Calculator', status: 'active' },
-    { icon: Cloud, name: 'Weather', status: 'active' },
-    { icon: FolderOpen, name: 'Workspace', status: 'active' },
-    { icon: Search, name: 'Web Search', status: 'idle' },
-];
+const TOOL_ICONS: Record<string, React.ElementType> = {
+    calculator: Calculator,
+    weather: Cloud,
+    list_directory: FolderOpen,
+    search_files: Search,
+    execute_command: Terminal,
+};
 
-const recentChats = [
-    { id: 1, title: 'Project Setup', time: '2m ago', starred: true },
-    { id: 2, title: 'Memory Config', time: '15m ago', starred: false },
-    { id: 3, title: 'WhatsApp Integration', time: '1h ago', starred: true },
-    { id: 4, title: 'Tool Debugging', time: '3h ago', starred: false },
-];
+interface SidePanelProps {
+    agentStatus: AgentStatus | null;
+}
 
-export default function SidePanel() {
+export default function SidePanel({ agentStatus }: SidePanelProps) {
     const [activeNav, setActiveNav] = useState('Chat');
     const [toolsExpanded, setToolsExpanded] = useState(true);
     const [chatsExpanded, setChatsExpanded] = useState(true);
+
+    const toolNames = agentStatus?.tools || [];
 
     return (
         <aside className="w-72 glass-panel-solid rounded-xl flex flex-col h-full overflow-hidden">
@@ -99,11 +95,6 @@ export default function SidePanel() {
                             <span className="text-xs font-medium flex-1 text-left">
                                 {item.label}
                             </span>
-                            {item.badge && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-accent-primary/15 text-accent-primary-light">
-                                    {item.badge}
-                                </span>
-                            )}
                         </button>
                     );
                 })}
@@ -130,32 +121,19 @@ export default function SidePanel() {
 
                 {chatsExpanded && (
                     <div className="space-y-0.5 animate-fade-in">
-                        {recentChats.map((chat) => (
-                            <button
-                                key={chat.id}
-                                className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-all duration-150 cursor-pointer group"
-                            >
-                                <Hash size={12} className="text-text-muted shrink-0" />
-                                <span className="text-xs font-medium truncate flex-1 text-left">
-                                    {chat.title}
-                                </span>
-                                {chat.starred && (
-                                    <Star
-                                        size={10}
-                                        className="text-warning/60 fill-warning/60 shrink-0"
-                                    />
-                                )}
-                                <span className="text-[10px] text-text-muted font-mono shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {chat.time}
-                                </span>
-                            </button>
-                        ))}
+                        <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-all duration-150 cursor-pointer group">
+                            <Hash size={12} className="text-text-muted shrink-0" />
+                            <span className="text-xs font-medium truncate flex-1 text-left">
+                                Current Session
+                            </span>
+                            <Star size={10} className="text-warning/60 fill-warning/60 shrink-0" />
+                        </button>
                     </div>
                 )}
 
                 <div className="h-px bg-border-default mx-2 my-2" />
 
-                {/* Agent Tools */}
+                {/* Agent Tools (from server) */}
                 <button
                     onClick={() => setToolsExpanded(!toolsExpanded)}
                     className="w-full flex items-center gap-2 px-4 py-2.5 cursor-pointer group"
@@ -173,26 +151,27 @@ export default function SidePanel() {
 
                 {toolsExpanded && (
                     <div className="space-y-0.5 animate-fade-in">
-                        {tools.map((tool) => (
-                            <div
-                                key={tool.name}
-                                className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-bg-hover transition-colors group cursor-default"
-                            >
-                                <tool.icon
-                                    size={13}
-                                    className="text-text-muted group-hover:text-text-secondary shrink-0"
-                                />
-                                <span className="text-xs text-text-secondary group-hover:text-text-primary flex-1 font-medium">
-                                    {tool.name}
-                                </span>
+                        {toolNames.map((name) => {
+                            const Icon = TOOL_ICONS[name] || Wrench;
+                            return (
                                 <div
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${tool.status === 'active'
-                                            ? 'bg-success/70'
-                                            : 'bg-text-muted/30'
-                                        }`}
-                                />
-                            </div>
-                        ))}
+                                    key={name}
+                                    className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-bg-hover transition-colors group cursor-default"
+                                >
+                                    <Icon
+                                        size={13}
+                                        className="text-text-muted group-hover:text-text-secondary shrink-0"
+                                    />
+                                    <span className="text-xs text-text-secondary group-hover:text-text-primary flex-1 font-medium">
+                                        {name}
+                                    </span>
+                                    <div className="w-1.5 h-1.5 rounded-full shrink-0 bg-success/70" />
+                                </div>
+                            );
+                        })}
+                        {toolNames.length === 0 && (
+                            <p className="text-xs text-text-muted px-4 py-2">Connecting...</p>
+                        )}
                     </div>
                 )}
             </div>
@@ -200,18 +179,24 @@ export default function SidePanel() {
             {/* Bottom — WhatsApp Status */}
             <div className="p-4 border-t border-border-default">
                 <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-bg-tertiary/40 border border-border-default">
-                    <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
-                        <Smartphone size={14} className="text-success" />
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${agentStatus?.whatsapp === 'connected' ? 'bg-success/10' : 'bg-text-muted/10'
+                        }`}>
+                        <Smartphone size={14} className={
+                            agentStatus?.whatsapp === 'connected' ? 'text-success' : 'text-text-muted'
+                        } />
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
                         <span className="text-xs font-medium text-text-primary truncate">
                             WhatsApp
                         </span>
-                        <span className="text-[10px] text-success font-medium">
-                            Connected
+                        <span className={`text-[10px] font-medium ${agentStatus?.whatsapp === 'connected' ? 'text-success' : 'text-text-muted'
+                            }`}>
+                            {agentStatus?.whatsapp === 'connected' ? 'Connected' : 'Disabled'}
                         </span>
                     </div>
-                    <div className="w-2 h-2 rounded-full bg-success/60 animate-pulse-glow" />
+                    {agentStatus?.whatsapp === 'connected' && (
+                        <div className="w-2 h-2 rounded-full bg-success/60 animate-pulse-glow" />
+                    )}
                 </div>
             </div>
         </aside>

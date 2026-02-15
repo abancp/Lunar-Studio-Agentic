@@ -6,9 +6,19 @@ import {
     Zap,
     ChevronDown,
     Wifi,
+    WifiOff,
 } from 'lucide-react';
+import type { AgentStatus } from '../hooks/useWebSocket';
 
-export default function TopPanel() {
+interface TopPanelProps {
+    isConnected: boolean;
+    agentStatus: AgentStatus | null;
+}
+
+export default function TopPanel({ isConnected, agentStatus }: TopPanelProps) {
+    const provider = agentStatus?.provider || '—';
+    const model = agentStatus?.model || '—';
+
     return (
         <header className="h-16 glass-panel-solid rounded-xl flex items-center justify-between px-6 z-20 relative shrink-0">
             {/* Left — Branding */}
@@ -30,36 +40,40 @@ export default function TopPanel() {
             <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4">
                 {/* Status Indicator */}
                 <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-bg-tertiary/60 border border-border-default">
-                    <div className="w-2 h-2 rounded-full bg-success animate-pulse-glow" />
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-success animate-pulse-glow' : 'bg-danger'}`} />
                     <span className="text-xs text-text-secondary font-medium">
-                        Agent Online
+                        {isConnected ? 'Agent Online' : 'Disconnected'}
                     </span>
                 </div>
 
                 {/* Provider Badge */}
                 <button className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-bg-tertiary/60 border border-border-default hover:border-border-hover transition-colors cursor-pointer group">
                     <Cpu size={12} className="text-accent-primary-light" />
-                    <span className="text-xs text-text-secondary font-medium group-hover:text-text-primary transition-colors">
-                        Google Gemini
+                    <span className="text-xs text-text-secondary font-medium group-hover:text-text-primary transition-colors capitalize">
+                        {provider}
                     </span>
                     <ChevronDown size={10} className="text-text-muted" />
                 </button>
 
-                {/* Latency */}
+                {/* Model */}
                 <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-bg-tertiary/60 border border-border-default">
                     <Zap size={11} className="text-accent-secondary" />
                     <span className="text-xs text-text-secondary font-mono">
-                        142ms
+                        {model}
                     </span>
                 </div>
             </div>
 
             {/* Right — Actions */}
             <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 mr-3 px-3 py-1.5 rounded-lg bg-bg-tertiary/40 border border-border-default">
-                    <Wifi size={11} className="text-success" />
+                <div className={`flex items-center gap-1.5 mr-3 px-3 py-1.5 rounded-lg border border-border-default ${isConnected ? 'bg-bg-tertiary/40' : 'bg-danger/10'}`}>
+                    {isConnected ? (
+                        <Wifi size={11} className="text-success" />
+                    ) : (
+                        <WifiOff size={11} className="text-danger" />
+                    )}
                     <span className="text-[10px] text-text-muted font-medium">
-                        Connected
+                        {isConnected ? 'Connected' : 'Offline'}
                     </span>
                 </div>
 

@@ -8,16 +8,23 @@ import {
     Sparkles,
     StopCircle,
 } from 'lucide-react';
+import type { AgentStatus } from '../hooks/useWebSocket';
 
-export default function BottomPanel() {
+interface BottomPanelProps {
+    onSend: (message: string) => void;
+    onStop: () => void;
+    isGenerating: boolean;
+    isConnected: boolean;
+    agentStatus: AgentStatus | null;
+}
+
+export default function BottomPanel({ onSend, onStop, isGenerating, isConnected, agentStatus }: BottomPanelProps) {
     const [input, setInput] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
 
     const handleSend = () => {
-        if (!input.trim()) return;
-        setIsGenerating(true);
+        if (!input.trim() || !isConnected) return;
+        onSend(input.trim());
         setInput('');
-        setTimeout(() => setIsGenerating(false), 2000);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -26,6 +33,9 @@ export default function BottomPanel() {
             handleSend();
         }
     };
+
+    const model = agentStatus?.model || '—';
+    const toolCount = agentStatus?.tools?.length || 0;
 
     return (
         <div className="glass-panel-solid rounded-xl px-6 py-5 shrink-0">
@@ -43,9 +53,10 @@ export default function BottomPanel() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            placeholder="Message Lunar Studio..."
+                            placeholder={isConnected ? 'Message Lunar Studio...' : 'Connecting to agent...'}
+                            disabled={!isConnected}
                             rows={1}
-                            className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none resize-none px-5 py-4 max-h-32 min-h-[52px] font-sans leading-relaxed"
+                            className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none resize-none px-5 py-4 max-h-32 min-h-[52px] font-sans leading-relaxed disabled:opacity-50"
                             style={{
                                 height: input ? 'auto' : '52px',
                             }}
@@ -59,7 +70,7 @@ export default function BottomPanel() {
 
                             {isGenerating ? (
                                 <button
-                                    onClick={() => setIsGenerating(false)}
+                                    onClick={onStop}
                                     className="p-2.5 rounded-xl bg-danger/15 text-danger hover:bg-danger/25 transition-colors cursor-pointer"
                                 >
                                     <StopCircle size={18} />
@@ -67,8 +78,8 @@ export default function BottomPanel() {
                             ) : (
                                 <button
                                     onClick={handleSend}
-                                    disabled={!input.trim()}
-                                    className={`p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${input.trim()
+                                    disabled={!input.trim() || !isConnected}
+                                    className={`p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${input.trim() && isConnected
                                             ? 'bg-accent-primary text-white shadow-lg shadow-accent-primary/20 hover:bg-accent-primary/90 scale-100'
                                             : 'bg-bg-hover text-text-muted scale-95'
                                         }`}
@@ -100,11 +111,11 @@ export default function BottomPanel() {
                         <div className="flex items-center gap-2">
                             <Sparkles size={12} className="text-text-muted" />
                             <span className="text-xs text-text-muted">
-                                gemini-2.0-flash
+                                {model}
                             </span>
                             <span className="text-xs text-text-muted">·</span>
                             <span className="text-xs text-text-muted">
-                                4 tools active
+                                {toolCount} tools active
                             </span>
                         </div>
                     )}

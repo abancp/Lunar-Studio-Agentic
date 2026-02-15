@@ -1,5 +1,6 @@
 import { logger } from './log.js';
 import { WhatsAppService } from '../external-apps/whatsapp.js';
+import { WebServer } from './server.js';
 import * as config from './cli/config.js';
 
 export async function startDaemon() {
@@ -8,12 +9,16 @@ export async function startDaemon() {
     // 1. Load Config
     const provider = config.getProvider();
     if (!provider) {
-        logger.error('No LLM Provider configured. Run "npm run setup" first.');
+        logger.error('No LLM Provider configured. Run "lunarstudio setup" first.');
         process.exit(1);
     }
     logger.info(`LLM Provider: ${provider}`);
 
-    // 2. Start WhatsApp Service
+    // 2. Start Web UI Server (always runs)
+    const webServer = new WebServer(3210);
+    await webServer.start();
+
+    // 3. Start WhatsApp Service
     const waConfig = config.getWhatsAppConfig();
     if (waConfig && waConfig.enabled) {
         const whatsapp = new WhatsAppService();
@@ -22,15 +27,7 @@ export async function startDaemon() {
         logger.info('WhatsApp service is disabled or not configured.');
     }
 
-    // 3. Keep alive (handled by WhatsApp client usually, or just empty interval)
-    // If no services are running, exit?
-    if (!waConfig?.enabled) {
-        logger.warn('No active services enabled. Exiting.');
-    } else {
-        logger.info('Daemon is running. Press Ctrl+C to stop.');
-        // Prevent exit
-        setInterval(() => { }, 1000 * 60 * 60);
-    }
+    logger.info('Daemon is running. Press Ctrl+C to stop.');
 }
 
 // Handle signals
