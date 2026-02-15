@@ -17,22 +17,7 @@ import {
     Sparkles,
     Terminal,
 } from 'lucide-react';
-import type { AgentStatus } from '../hooks/useWebSocket';
-
-interface NavItem {
-    icon: React.ElementType;
-    label: string;
-    badge?: string;
-    active?: boolean;
-}
-
-const navItems: NavItem[] = [
-    { icon: MessageSquare, label: 'Chat', active: true },
-    { icon: Brain, label: 'Memory' },
-    { icon: Wrench, label: 'Tools' },
-    { icon: ScrollText, label: 'Logs' },
-    { icon: Smartphone, label: 'Apps' },
-];
+import type { AgentStatus, NavPage } from '../hooks/useWebSocket';
 
 const TOOL_ICONS: Record<string, React.ElementType> = {
     calculator: Calculator,
@@ -42,12 +27,27 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
     execute_command: Terminal,
 };
 
-interface SidePanelProps {
-    agentStatus: AgentStatus | null;
+interface NavItem {
+    icon: React.ElementType;
+    label: string;
+    page: NavPage;
 }
 
-export default function SidePanel({ agentStatus }: SidePanelProps) {
-    const [activeNav, setActiveNav] = useState('Chat');
+const navItems: NavItem[] = [
+    { icon: MessageSquare, label: 'Chat', page: 'chat' },
+    { icon: Brain, label: 'Memory', page: 'memory' },
+    { icon: Wrench, label: 'Tools', page: 'tools' },
+    { icon: ScrollText, label: 'Logs', page: 'logs' },
+    { icon: Smartphone, label: 'Apps', page: 'apps' },
+];
+
+interface SidePanelProps {
+    agentStatus: AgentStatus | null;
+    activePage: NavPage;
+    onNavigate: (page: NavPage) => void;
+}
+
+export default function SidePanel({ agentStatus, activePage, onNavigate }: SidePanelProps) {
     const [toolsExpanded, setToolsExpanded] = useState(true);
     const [chatsExpanded, setChatsExpanded] = useState(true);
 
@@ -73,11 +73,11 @@ export default function SidePanel({ agentStatus }: SidePanelProps) {
             {/* Navigation */}
             <nav className="px-3 pb-2">
                 {navItems.map((item) => {
-                    const isActive = activeNav === item.label;
+                    const isActive = activePage === item.page;
                     return (
                         <button
-                            key={item.label}
-                            onClick={() => setActiveNav(item.label)}
+                            key={item.page}
+                            onClick={() => onNavigate(item.page)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg mb-1 transition-all duration-200 cursor-pointer group
                 ${isActive
                                     ? 'bg-accent-primary/12 text-accent-primary-light border border-accent-primary/15'
@@ -110,8 +110,7 @@ export default function SidePanel({ agentStatus }: SidePanelProps) {
                 >
                     <ChevronRight
                         size={12}
-                        className={`text-text-muted transition-transform duration-200 ${chatsExpanded ? 'rotate-90' : ''
-                            }`}
+                        className={`text-text-muted transition-transform duration-200 ${chatsExpanded ? 'rotate-90' : ''}`}
                     />
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted group-hover:text-text-secondary transition-colors">
                         Recent
@@ -121,7 +120,10 @@ export default function SidePanel({ agentStatus }: SidePanelProps) {
 
                 {chatsExpanded && (
                     <div className="space-y-0.5 animate-fade-in">
-                        <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-all duration-150 cursor-pointer group">
+                        <button
+                            onClick={() => onNavigate('chat')}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-text-secondary hover:bg-bg-hover hover:text-text-primary transition-all duration-150 cursor-pointer group"
+                        >
                             <Hash size={12} className="text-text-muted shrink-0" />
                             <span className="text-xs font-medium truncate flex-1 text-left">
                                 Current Session
@@ -133,15 +135,14 @@ export default function SidePanel({ agentStatus }: SidePanelProps) {
 
                 <div className="h-px bg-border-default mx-2 my-2" />
 
-                {/* Agent Tools (from server) */}
+                {/* Agent Tools */}
                 <button
                     onClick={() => setToolsExpanded(!toolsExpanded)}
                     className="w-full flex items-center gap-2 px-4 py-2.5 cursor-pointer group"
                 >
                     <ChevronRight
                         size={12}
-                        className={`text-text-muted transition-transform duration-200 ${toolsExpanded ? 'rotate-90' : ''
-                            }`}
+                        className={`text-text-muted transition-transform duration-200 ${toolsExpanded ? 'rotate-90' : ''}`}
                     />
                     <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted group-hover:text-text-secondary transition-colors">
                         Tools
@@ -158,10 +159,7 @@ export default function SidePanel({ agentStatus }: SidePanelProps) {
                                     key={name}
                                     className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-bg-hover transition-colors group cursor-default"
                                 >
-                                    <Icon
-                                        size={13}
-                                        className="text-text-muted group-hover:text-text-secondary shrink-0"
-                                    />
+                                    <Icon size={13} className="text-text-muted group-hover:text-text-secondary shrink-0" />
                                     <span className="text-xs text-text-secondary group-hover:text-text-primary flex-1 font-medium">
                                         {name}
                                     </span>
@@ -186,9 +184,7 @@ export default function SidePanel({ agentStatus }: SidePanelProps) {
                         } />
                     </div>
                     <div className="flex flex-col flex-1 min-w-0">
-                        <span className="text-xs font-medium text-text-primary truncate">
-                            WhatsApp
-                        </span>
+                        <span className="text-xs font-medium text-text-primary truncate">WhatsApp</span>
                         <span className={`text-[10px] font-medium ${agentStatus?.whatsapp === 'connected' ? 'text-success' : 'text-text-muted'
                             }`}>
                             {agentStatus?.whatsapp === 'connected' ? 'Connected' : 'Disabled'}

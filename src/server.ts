@@ -2,24 +2,26 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { WebSocketServer, WebSocket } from 'ws';
-import { logger } from './log.js';
+import { logger, getLogPath } from './log.js';
 import * as config from './cli/config.js';
 import { createLLM } from '../llm/factory.js';
 import { tools, getTool } from '../tools/index.js';
 import { HistoryManager } from './cli/history.js';
 import { buildSystemPrompt } from '../llm/system.js';
 import { MemoryManager } from './memory.js';
-import type { LLMProvider } from '../llm/types.js';
+import type { LLMProvider, Tool } from '../llm/types.js';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 
 // ── WebSocket Message Types ──
 
 interface ClientMessage {
-    type: 'chat' | 'stop' | 'get_status';
+    type: 'chat' | 'stop' | 'get_status' | 'get_logs' | 'get_memories' | 'get_tools';
     message?: string;
 }
 
 interface ServerMessage {
-    type: 'text' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'status' | 'welcome';
+    type: 'text' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'status' | 'welcome'
+    | 'logs' | 'log_line' | 'memories' | 'tools_list';
     [key: string]: any;
 }
 
@@ -72,25 +74,18 @@ export class WebServer {
 
     private handleHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
         let urlPath = req.url || '/';
-
-        // Strip query string
         urlPath = urlPath.split('?')[0]!;
-
-        // Default to index.html
         if (urlPath === '/') urlPath = '/index.html';
 
         const filePath = path.join(this.staticDir, urlPath);
 
-        // Security: prevent path traversal
         if (!filePath.startsWith(this.staticDir)) {
             res.writeHead(403);
             res.end('Forbidden');
             return;
         }
 
-        // Check if file exists
         if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-            // SPA fallback: serve index.html for any non-file route
             const indexPath = path.join(this.staticDir, 'index.html');
             if (fs.existsSync(indexPath)) {
                 res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -104,7 +99,6 @@ export class WebServer {
 
         const ext = path.extname(filePath);
         const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-
         res.writeHead(200, { 'Content-Type': contentType });
         fs.createReadStream(filePath).pipe(res);
     }
@@ -117,6 +111,7 @@ export class WebServer {
         const history = new HistoryManager();
         let isGenerating = false;
         let shouldStop = false;
+        let logWatcher: fs.FSWatcher | null = null;
 
         // Initialize system prompt with memory
         const memoryContext = this.memoryManager.getContextString('owner');
@@ -143,6 +138,22 @@ export class WebServer {
 
                 case 'stop':
                     shouldStop = true;
+                    break;
+
+                case 'get_logs':
+                    this.sendLogs(ws);
+                    // Start watching for new logs
+                    if (!logWatcher) {
+                        logWatcher = this.watchLogs(ws);
+                    }
+                    break;
+
+                case 'get_memories':
+                    this.sendMemories(ws);
+                    break;
+
+                case 'get_tools':
+                    this.sendTools(ws);
                     break;
 
                 case 'chat':
@@ -173,11 +184,97 @@ export class WebServer {
         ws.on('close', () => {
             logger.info('Web UI client disconnected');
             shouldStop = true;
+            if (logWatcher) {
+                logWatcher.close();
+                logWatcher = null;
+            }
         });
 
         ws.on('error', (err) => {
             logger.error(`WebSocket error: ${err.message}`);
         });
+    }
+
+    // ── Logs Handler ──
+
+    private sendLogs(ws: WebSocket) {
+        const logPath = getLogPath();
+        try {
+            if (!fs.existsSync(logPath)) {
+                this.send(ws, { type: 'logs', lines: [] });
+                return;
+            }
+            const content = fs.readFileSync(logPath, 'utf-8');
+            const lines = content.trim().split('\n').slice(-200); // Last 200 lines
+            const parsed = lines.map(line => {
+                try {
+                    return JSON.parse(line);
+                } catch {
+                    return { level: 'info', message: line, timestamp: '' };
+                }
+            });
+            this.send(ws, { type: 'logs', lines: parsed });
+        } catch (err: any) {
+            this.send(ws, { type: 'error', message: `Failed to read logs: ${err.message}` });
+        }
+    }
+
+    private watchLogs(ws: WebSocket): fs.FSWatcher {
+        const logPath = getLogPath();
+        let lastSize = fs.existsSync(logPath) ? fs.statSync(logPath).size : 0;
+
+        return fs.watch(logPath, () => {
+            try {
+                const stats = fs.statSync(logPath);
+                if (stats.size > lastSize) {
+                    const fd = fs.openSync(logPath, 'r');
+                    const buffer = Buffer.alloc(stats.size - lastSize);
+                    fs.readSync(fd, buffer, 0, buffer.length, lastSize);
+                    fs.closeSync(fd);
+
+                    const newData = buffer.toString('utf-8').trim();
+                    if (newData) {
+                        for (const line of newData.split('\n')) {
+                            try {
+                                const parsed = JSON.parse(line);
+                                this.send(ws, { type: 'log_line', line: parsed });
+                            } catch {
+                                this.send(ws, { type: 'log_line', line: { level: 'info', message: line, timestamp: '' } });
+                            }
+                        }
+                    }
+                    lastSize = stats.size;
+                }
+            } catch {
+                // ignore
+            }
+        });
+    }
+
+    // ── Memories Handler ──
+
+    private sendMemories(ws: WebSocket) {
+        const memories = this.memoryManager.getAllMemories();
+        this.send(ws, { type: 'memories', memories });
+    }
+
+    // ── Tools Handler ──
+
+    private sendTools(ws: WebSocket) {
+        const toolList = tools.map((t: Tool) => {
+            let schema: any = {};
+            try {
+                schema = zodToJsonSchema(t.schema);
+            } catch {
+                // pass
+            }
+            return {
+                name: t.name,
+                description: t.description,
+                schema,
+            };
+        });
+        this.send(ws, { type: 'tools_list', tools: toolList });
     }
 
     // ── Chat Handler (Agentic Loop) ──
@@ -199,7 +296,6 @@ export class WebServer {
 
         const llm: LLMProvider = createLLM(providerName, apiKey, model || 'default');
 
-        // Refresh memory context
         const memoryContext = this.memoryManager.getContextString('owner', userMessage);
         if (memoryContext) {
             history.addSystemMessage(buildSystemPrompt(memoryContext));
@@ -212,21 +308,15 @@ export class WebServer {
             keepGenerating = false;
 
             const response = await llm.generate(history.getMessages(), tools);
-
             let content = response.content || '';
-
-            // Parse and save memories
             content = this.memoryManager.parseAndSaveMemories(content, 'owner');
 
-            // Send text to client
             if (content) {
                 this.send(ws, { type: 'text', content });
             }
 
-            // Store in history
             history.addMessage(response.role, content, response.tool_calls);
 
-            // Handle tool calls
             if (response.tool_calls && response.tool_calls.length > 0 && !isStopped()) {
                 for (const call of response.tool_calls) {
                     if (isStopped()) break;
@@ -239,7 +329,6 @@ export class WebServer {
                         // pass
                     }
 
-                    // Notify client: tool started
                     this.send(ws, {
                         type: 'tool_start',
                         name: toolName,
@@ -261,7 +350,6 @@ export class WebServer {
                         }
                     }
 
-                    // Notify client: tool result
                     this.send(ws, {
                         type: 'tool_result',
                         name: toolName,

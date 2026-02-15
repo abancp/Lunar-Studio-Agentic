@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 // ── Types ──
 
+export type NavPage = 'chat' | 'memory' | 'tools' | 'logs' | 'apps';
+
 export interface ChatMessage {
     id: string;
     role: 'user' | 'assistant';
@@ -25,6 +27,27 @@ export interface AgentStatus {
     whatsapp: string;
 }
 
+export interface LogEntry {
+    level: string;
+    message: string;
+    timestamp: string;
+    [key: string]: any;
+}
+
+export interface MemoryEntry {
+    id: string;
+    content: string;
+    personId: string;
+    createdAt: number;
+    tags?: string[];
+}
+
+export interface ToolDetail {
+    name: string;
+    description: string;
+    schema: any;
+}
+
 // ── Hook ──
 
 export function useWebSocket() {
@@ -32,15 +55,17 @@ export function useWebSocket() {
     const [isConnected, setIsConnected] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
     const [agentStatus, setAgentStatus] = useState<AgentStatus | null>(null);
+    const [logs, setLogs] = useState<LogEntry[]>([]);
+    const [memories, setMemories] = useState<MemoryEntry[]>([]);
+    const [toolDetails, setToolDetails] = useState<ToolDetail[]>([]);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
     const reconnectAttempt = useRef(0);
-    const pendingToolCalls = useRef<Map<string, number>>(new Map()); // toolName -> messageIndex
+    const pendingToolCalls = useRef<Map<string, number>>(new Map());
 
     const getWsUrl = () => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        // In dev mode (Vite port), connect to the daemon port
         const host = window.location.hostname;
         const port = window.location.port === '5174' || window.location.port === '5173'
             ? '3210'
@@ -58,23 +83,18 @@ export function useWebSocket() {
         ws.onopen = () => {
             setIsConnected(true);
             reconnectAttempt.current = 0;
-            // Request status on connect
             ws.send(JSON.stringify({ type: 'get_status' }));
         };
 
         ws.onclose = () => {
             setIsConnected(false);
             wsRef.current = null;
-
-            // Exponential backoff reconnect
             const delay = Math.min(1000 * Math.pow(2, reconnectAttempt.current), 10000);
             reconnectAttempt.current++;
             reconnectTimer.current = setTimeout(connect, delay);
         };
 
-        ws.onerror = () => {
-            // Will trigger onclose
-        };
+        ws.onerror = () => { };
 
         ws.onmessage = (event) => {
             let msg: any;
@@ -91,17 +111,14 @@ export function useWebSocket() {
 
                 case 'text': {
                     const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    // Merge pending tool calls into this message
                     const toolCalls: ToolCallInfo[] = [];
                     pendingToolCalls.current.forEach((_idx, name) => {
                         toolCalls.push({ name, args: '', status: 'done' });
                     });
 
                     setMessages(prev => {
-                        // Check if last message is an assistant message being built
                         const last = prev[prev.length - 1];
                         if (last && last.role === 'assistant' && last.content === '' && last.toolCalls && last.toolCalls.length > 0) {
-                            // This text comes after tool calls — create new message with the tool calls attached
                             const updated = [...prev];
                             updated[prev.length - 1] = {
                                 ...last,
@@ -132,7 +149,6 @@ export function useWebSocket() {
 
                     setMessages(prev => {
                         const last = prev[prev.length - 1];
-                        // If last message is assistant with pending tool calls, append
                         if (last && last.role === 'assistant' && last.toolCalls) {
                             const updated = [...prev];
                             updated[prev.length - 1] = {
@@ -141,7 +157,6 @@ export function useWebSocket() {
                             };
                             return updated;
                         }
-                        // Create a new assistant message with tool call
                         return [...prev, {
                             id: `msg-${Date.now()}`,
                             role: 'assistant' as const,
@@ -156,7 +171,6 @@ export function useWebSocket() {
                 case 'tool_result': {
                     setMessages(prev => {
                         const updated = [...prev];
-                        // Find the last assistant message with this tool
                         for (let i = updated.length - 1; i >= 0; i--) {
                             const m = updated[i]!;
                             if (m.role === 'assistant' && m.toolCalls) {
@@ -189,7 +203,24 @@ export function useWebSocket() {
                     break;
 
                 case 'welcome':
-                    // Connection established
+                    break;
+
+                // ── New data types ──
+
+                case 'logs':
+                    setLogs(msg.lines || []);
+                    break;
+
+                case 'log_line':
+                    setLogs(prev => [...prev, msg.line]);
+                    break;
+
+                case 'memories':
+                    setMemories(msg.memories || []);
+                    break;
+
+                case 'tools_list':
+                    setToolDetails(msg.tools || []);
                     break;
             }
         };
@@ -209,7 +240,6 @@ export function useWebSocket() {
 
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // Add user message locally
         setMessages(prev => [...prev, {
             id: `msg-${Date.now()}`,
             role: 'user' as const,
@@ -227,12 +257,33 @@ export function useWebSocket() {
         setIsGenerating(false);
     }, []);
 
+    const requestLogs = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'get_logs' }));
+    }, []);
+
+    const requestMemories = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'get_memories' }));
+    }, []);
+
+    const requestTools = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'get_tools' }));
+    }, []);
+
     return {
         messages,
         isConnected,
         isGenerating,
         agentStatus,
+        logs,
+        memories,
+        toolDetails,
         sendMessage,
         stopGenerating,
+        requestLogs,
+        requestMemories,
+        requestTools,
     };
 }

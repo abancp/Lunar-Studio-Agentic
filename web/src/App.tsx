@@ -1,11 +1,16 @@
+import { useState } from 'react';
 import TopPanel from './components/TopPanel';
 import SidePanel from './components/SidePanel';
 import MainPanel from './components/MainPanel';
 import BottomPanel from './components/BottomPanel';
-import { useWebSocket } from './hooks/useWebSocket';
+import LogsView from './components/LogsView';
+import MemoryView from './components/MemoryView';
+import ToolsView from './components/ToolsView';
+import { useWebSocket, type NavPage } from './hooks/useWebSocket';
 
 export default function App() {
   const ws = useWebSocket();
+  const [activePage, setActivePage] = useState<NavPage>('chat');
 
   return (
     <div className="h-screen w-screen bg-bg-primary p-2 flex flex-col gap-2 overflow-hidden">
@@ -18,22 +23,57 @@ export default function App() {
       {/* Body: Side + Main/Bottom */}
       <div className="flex flex-1 min-h-0 gap-2">
         {/* Side Panel */}
-        <SidePanel agentStatus={ws.agentStatus} />
+        <SidePanel
+          agentStatus={ws.agentStatus}
+          activePage={activePage}
+          onNavigate={setActivePage}
+        />
 
-        {/* Main Content + Bottom */}
+        {/* Main Content Area — changes based on active page */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0 gap-2">
-          <MainPanel
-            messages={ws.messages}
-            isGenerating={ws.isGenerating}
-            agentStatus={ws.agentStatus}
-          />
-          <BottomPanel
-            onSend={ws.sendMessage}
-            onStop={ws.stopGenerating}
-            isGenerating={ws.isGenerating}
-            isConnected={ws.isConnected}
-            agentStatus={ws.agentStatus}
-          />
+          {activePage === 'chat' && (
+            <>
+              <MainPanel
+                messages={ws.messages}
+                isGenerating={ws.isGenerating}
+                agentStatus={ws.agentStatus}
+              />
+              <BottomPanel
+                onSend={ws.sendMessage}
+                onStop={ws.stopGenerating}
+                isGenerating={ws.isGenerating}
+                isConnected={ws.isConnected}
+                agentStatus={ws.agentStatus}
+              />
+            </>
+          )}
+
+          {activePage === 'logs' && (
+            <LogsView
+              logs={ws.logs}
+              onRequestLogs={ws.requestLogs}
+            />
+          )}
+
+          {activePage === 'memory' && (
+            <MemoryView
+              memories={ws.memories}
+              onRequestMemories={ws.requestMemories}
+            />
+          )}
+
+          {activePage === 'tools' && (
+            <ToolsView
+              toolDetails={ws.toolDetails}
+              onRequestTools={ws.requestTools}
+            />
+          )}
+
+          {activePage === 'apps' && (
+            <main className="flex-1 flex flex-col items-center justify-center min-h-0 glass-panel-solid rounded-xl">
+              <p className="text-text-muted text-sm">Apps coming soon...</p>
+            </main>
+          )}
         </div>
       </div>
     </div>
