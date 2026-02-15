@@ -147,7 +147,7 @@ export class WhatsAppService {
             return;
         }
 
-        if (!msg.body.startsWith(this.hotword)) {
+        if (!msg.body.startsWith(TO_AI_COMMAND)) {
             logger.info(`Message from ${chatId} does not start with hotword. Ignoring.`);
             return;
         }
