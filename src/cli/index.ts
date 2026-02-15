@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { setupCommand } from './setup.js';
 import { chatCommand } from './chat.js';
 import { listModelsCommand } from './list-models.js';
+import { memoriesCommand } from './memories.js';
 
 const program = new Command();
 
@@ -12,9 +13,9 @@ program
     .version('1.0.0');
 
 program
-    .command('setup')
-    .description('Configure API keys and default models for LLM providers')
-    .action(setupCommand);
+    .command('setup [target]')
+    .description('Configure the agent (target: llm, whatsapp, people)')
+    .action((target) => setupCommand(target));
 
 program
     .command('chat')
@@ -25,6 +26,12 @@ program
     .command('list-models')
     .description('List available models for the configured provider')
     .action(listModelsCommand);
+
+program
+    .command('memories')
+    .description('View stored memories')
+    .option('-p, --person <name>', 'Filter by person name (or "owner")')
+    .action((options) => memoriesCommand(options));
 
 program
     .command('daemon')

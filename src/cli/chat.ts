@@ -4,12 +4,14 @@ import * as config from './config.js';
 import { createLLM } from '../../llm/factory.js';
 import { tools, getTool } from '../../tools/index.js';
 import { HistoryManager } from './history.js';
-import { AGENTIC_SYSTEM_PROMPT } from '../../llm/system.js';
+import { AGENTIC_SYSTEM_PROMPT, buildSystemPrompt } from '../../llm/system.js';
+import { MemoryManager } from '../memory.js';
+
+const OWNER_PERSON_ID = 'owner';
 
 export async function chatCommand() {
     let providerName = config.getProvider();
 
-    // Interactive selection if no provider configured
     if (!providerName) {
         const answers = await inquirer.prompt([
             {
@@ -80,7 +82,12 @@ export async function chatCommand() {
 
     try {
         const llm = createLLM(providerName as string, (apiKey || '') as string, (model || '') as string);
-        const history = new HistoryManager(AGENTIC_SYSTEM_PROMPT);
+        const memoryManager = new MemoryManager();
+
+        // Build system prompt with memory context (owner = CLI user)
+        const memoryContext = memoryManager.getContextString(OWNER_PERSON_ID);
+        const systemPrompt = buildSystemPrompt(memoryContext);
+        const history = new HistoryManager(systemPrompt);
 
         while (true) {
             const { prompt } = await inquirer.prompt([
@@ -96,28 +103,35 @@ export async function chatCommand() {
                 break;
             }
 
-            // Add user message to history
+            // Refresh memory context with query-based search
+            const freshMemory = memoryManager.getContextString(OWNER_PERSON_ID, prompt);
+            if (freshMemory) {
+                history.addSystemMessage(buildSystemPrompt(freshMemory));
+            }
+
             history.addUserMessage(prompt);
 
             process.stdout.write(chalk.yellow('AI: '));
 
-            // Tool execution loop
             let keepGenerating = true;
             while (keepGenerating) {
-                keepGenerating = false; // default to stop unless tool call forces another turn
+                keepGenerating = false;
 
                 try {
                     const response = await llm.generate(history.getMessages(), tools);
 
-                    // Display response content if any
-                    if (response.content) {
-                        console.log(response.content);
+                    let content = response.content || '';
+
+                    // Parse and save inline memories (strips <MEMORY> block from visible text)
+                    content = memoryManager.parseAndSaveMemories(content, OWNER_PERSON_ID);
+
+                    if (content) {
+                        console.log(content);
                     }
 
-                    // Add assistant response to history
-                    history.addMessage(response.role, response.content, response.tool_calls);
+                    // Store the cleaned content in history (without memory tokens)
+                    history.addMessage(response.role, content, response.tool_calls);
 
-                    // Handle tool calls
                     if (response.tool_calls && response.tool_calls.length > 0) {
                         console.log(chalk.dim('\n[Tool Call Detected]'));
 
@@ -148,12 +162,9 @@ export async function chatCommand() {
                             }
 
                             console.log(chalk.dim(`Result: ${result.substring(0, 100)}...`));
-
-                            // Add tool result to history
                             history.addToolResult(call.id, toolName, result);
                         }
 
-                        // If we had tool calls, we must trigger generation again to let LLM see the results
                         keepGenerating = true;
                     }
 
@@ -168,4 +179,3 @@ export async function chatCommand() {
         console.error(chalk.red('Failed to initialize LLM:'), error);
     }
 }
-

@@ -20,6 +20,16 @@ interface ConfigSchema {
         allowedNumbers?: string[]; // E.g., '1234567890@c.us'
         hotword?: string;
     };
+    people?: Person[];
+}
+
+export interface Person {
+    id: string; // UUID or sanitized name
+    name: string;
+    whatsappNumber?: string; // e.g., 1234567890@c.us
+    relation: string; // e.g., "Friend", "Boss", "Mother"
+    notes?: string; // General behaviors or context
+    memoryAccessibleBy?: string[]; // Person IDs who can access this person's memories (default: ["owner"])
 }
 
 const config = new Conf<ConfigSchema>({
@@ -71,6 +81,15 @@ export const getWhatsAppConfig = () => {
 
 export const setWhatsAppConfig = (enabled: boolean, allowedNumbers?: string[]) => {
     config.set('whatsapp', { enabled, allowedNumbers });
+};
+
+
+export const getPeople = (): Person[] => {
+    return config.get('people') || [];
+};
+
+export const setPeople = (people: Person[]) => {
+    config.set('people', people);
 };
 
 export const clearConfig = (): void => {
