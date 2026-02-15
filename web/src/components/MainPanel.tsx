@@ -9,55 +9,106 @@ import {
     RefreshCw,
     Sparkles,
     ArrowDown,
+    ChevronDown,
+    Layers,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import type { ChatMessage, ToolCallInfo, AgentStatus } from '../hooks/useWebSocket';
 
-function ToolCallCard({ tool }: { tool: ToolCallInfo }) {
+// ── Single tool row inside the stack ──
+
+function ToolCallRow({ tool, isLast }: { tool: ToolCallInfo; isLast: boolean }) {
     const [expanded, setExpanded] = useState(false);
     const isRunning = tool.status === 'running';
 
     return (
-        <div className="my-3 rounded-xl border border-border-default bg-bg-tertiary/40 overflow-hidden animate-fade-in">
+        <>
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-bg-hover/50 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover/50 transition-colors cursor-pointer"
             >
-                <div className="w-6 h-6 rounded-md bg-accent-primary/15 flex items-center justify-center">
-                    <Wrench size={12} className="text-accent-primary-light" />
+                <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isRunning ? 'bg-accent-secondary/15' : 'bg-success/15'
+                    }`}>
+                    {isRunning ? (
+                        <Loader2 size={11} className="text-accent-secondary animate-spin" />
+                    ) : (
+                        <CheckCircle size={11} className="text-success" />
+                    )}
                 </div>
                 <span className="text-xs font-medium text-accent-primary-light">
                     {tool.name}
                 </span>
                 {tool.args && (
-                    <span className="text-[10px] text-text-muted font-mono ml-1 truncate">
-                        ({tool.args})
+                    <span className="text-[10px] text-text-muted font-mono ml-0.5 truncate flex-1 text-left">
+                        {tool.args}
                     </span>
                 )}
                 <div className="ml-auto flex items-center gap-1.5 shrink-0">
-                    {isRunning ? (
-                        <>
-                            <Loader2 size={12} className="text-accent-secondary animate-spin" />
-                            <span className="text-[10px] text-accent-secondary font-medium">Running</span>
-                        </>
-                    ) : (
-                        <>
-                            <CheckCircle size={12} className="text-success" />
-                            <span className="text-[10px] text-success font-medium">Done</span>
-                        </>
+                    <span className={`text-[10px] font-medium ${isRunning ? 'text-accent-secondary' : 'text-success'}`}>
+                        {isRunning ? 'Running' : 'Done'}
+                    </span>
+                    {tool.result && (
+                        <ChevronDown size={10} className={`text-text-muted transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
                     )}
                 </div>
             </button>
             {expanded && tool.result && (
-                <div className="px-4 pb-3 border-t border-border-default">
-                    <pre className="text-[11px] font-mono text-text-secondary mt-3 p-3.5 rounded-lg bg-bg-primary/60 overflow-x-auto whitespace-pre-wrap">
+                <div className="px-4 pb-2.5">
+                    <pre className="text-[11px] font-mono text-text-secondary p-3 rounded-lg bg-bg-primary/60 overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto">
                         {tool.result}
                     </pre>
                 </div>
             )}
+            {!isLast && <div className="h-px bg-border-default/60 mx-3" />}
+        </>
+    );
+}
+
+// ── Stacked tool calls container ──
+
+function ToolCallStack({ tools }: { tools: ToolCallInfo[] }) {
+    const runningCount = tools.filter(t => t.status === 'running').length;
+    const doneCount = tools.filter(t => t.status === 'done').length;
+
+    return (
+        <div className="my-3 rounded-xl border border-border-default bg-bg-tertiary/40 overflow-hidden animate-fade-in">
+            {/* Stack header */}
+            <div className="flex items-center gap-2.5 px-4 py-2 bg-bg-tertiary/60 border-b border-border-default/60">
+                <div className="w-5 h-5 rounded-md bg-accent-primary/15 flex items-center justify-center">
+                    {tools.length > 1 ? (
+                        <Layers size={11} className="text-accent-primary-light" />
+                    ) : (
+                        <Wrench size={11} className="text-accent-primary-light" />
+                    )}
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                    {tools.length > 1 ? `${tools.length} Tool Calls` : 'Tool Call'}
+                </span>
+                <div className="ml-auto flex items-center gap-2">
+                    {runningCount > 0 && (
+                        <span className="text-[10px] text-accent-secondary font-medium flex items-center gap-1">
+                            <Loader2 size={10} className="animate-spin" />
+                            {runningCount} running
+                        </span>
+                    )}
+                    {doneCount > 0 && (
+                        <span className="text-[10px] text-success font-medium flex items-center gap-1">
+                            <CheckCircle size={10} />
+                            {doneCount} done
+                        </span>
+                    )}
+                </div>
+            </div>
+
+            {/* Tool rows */}
+            {tools.map((tool, i) => (
+                <ToolCallRow key={i} tool={tool} isLast={i === tools.length - 1} />
+            ))}
         </div>
     );
 }
+
+// ── Message bubble ──
 
 function MessageBubble({ message }: { message: ChatMessage }) {
     const isUser = message.role === 'user';
@@ -117,10 +168,10 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                     </div>
                 )}
 
-                {/* Tool Calls */}
-                {message.toolCalls?.map((tool, i) => (
-                    <ToolCallCard key={i} tool={tool} />
-                ))}
+                {/* Tool Calls — Stacked */}
+                {message.toolCalls && message.toolCalls.length > 0 && (
+                    <ToolCallStack tools={message.toolCalls} />
+                )}
 
                 {/* Meta */}
                 <div
@@ -148,6 +199,8 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         </div>
     );
 }
+
+// ── Main Panel ──
 
 interface MainPanelProps {
     messages: ChatMessage[];
@@ -214,7 +267,7 @@ export default function MainPanel({ messages, isGenerating, agentStatus }: MainP
                 {/* Welcome (show only when no messages) */}
                 {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-10 animate-fade-in">
-                        <div className="rounded-2xl bg-gradient-to-br from-accent-primary/20 to-accent-secondary/20 border border-border-default flex items-center justify-center mb-5 glow-accent" style={{ width: '72px', height: '72px' }}>
+                        <div className="rounded-2xl bg-linear-to-br from-accent-primary/20 to-accent-secondary/20 border border-border-default flex items-center justify-center mb-5 glow-accent" style={{ width: '72px', height: '72px' }}>
                             <Bot size={30} className="text-accent-primary-light" />
                         </div>
                         <h3 className="text-lg font-semibold text-gradient mb-2">
