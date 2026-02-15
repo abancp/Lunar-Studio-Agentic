@@ -142,16 +142,11 @@ export class WhatsAppService {
             logger.info(`Ai chat stopped with ${chatId}`);
             return;
         }
-        if (!this.aiEnabledNumbers[chatId]) {
-            logger.info(`Ai chat not enabled for ${chatId}. Ignoring.`);
+
+        if (!msg.body.startsWith(TO_AI_COMMAND) && !this.aiEnabledNumbers[chatId]) {
+            logger.info(`Message from ${chatId} does not start with hotword or ai chat not started. Ignoring.`);
             return;
         }
-
-        if (!msg.body.startsWith(TO_AI_COMMAND)) {
-            logger.info(`Message from ${chatId} does not start with hotword. Ignoring.`);
-            return;
-        }
-
 
         logger.info(`Received WhatsApp message from ${chatId}: ${msg.body}`);
 
