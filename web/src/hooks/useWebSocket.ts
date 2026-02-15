@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 // ── Types ──
 
-export type NavPage = 'chat' | 'memory' | 'tools' | 'logs' | 'apps';
+export type NavPage = 'chat' | 'memory' | 'tools' | 'logs' | 'apps' | 'settings';
 
 export interface ChatMessage {
     id: string;
@@ -48,6 +48,15 @@ export interface ToolDetail {
     schema: any;
 }
 
+export interface AgentConfig {
+    provider: string;
+    apiKeys: Record<string, boolean>;
+    models: Record<string, string>;
+    workspace: string;
+    whatsapp: { enabled: boolean; allowedNumbers?: string[] };
+    people: any[];
+}
+
 // ── Hook ──
 
 export function useWebSocket() {
@@ -58,6 +67,7 @@ export function useWebSocket() {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [memories, setMemories] = useState<MemoryEntry[]>([]);
     const [toolDetails, setToolDetails] = useState<ToolDetail[]>([]);
+    const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -222,6 +232,14 @@ export function useWebSocket() {
                 case 'tools_list':
                     setToolDetails(msg.tools || []);
                     break;
+
+                case 'config':
+                    setAgentConfig(msg as AgentConfig);
+                    break;
+
+                case 'config_updated':
+                    // Config was updated — will get a fresh 'config' message right after
+                    break;
             }
         };
     }, []);
@@ -272,6 +290,16 @@ export function useWebSocket() {
         wsRef.current.send(JSON.stringify({ type: 'get_tools' }));
     }, []);
 
+    const requestConfig = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'get_config' }));
+    }, []);
+
+    const updateConfig = useCallback((key: string, value: any) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'update_config', config: { key, value } }));
+    }, []);
+
     return {
         messages,
         isConnected,
@@ -280,10 +308,13 @@ export function useWebSocket() {
         logs,
         memories,
         toolDetails,
+        agentConfig,
         sendMessage,
         stopGenerating,
         requestLogs,
         requestMemories,
         requestTools,
+        requestConfig,
+        updateConfig,
     };
 }

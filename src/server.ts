@@ -15,13 +15,14 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 // ── WebSocket Message Types ──
 
 interface ClientMessage {
-    type: 'chat' | 'stop' | 'get_status' | 'get_logs' | 'get_memories' | 'get_tools';
+    type: 'chat' | 'stop' | 'get_status' | 'get_logs' | 'get_memories' | 'get_tools' | 'get_config' | 'update_config';
     message?: string;
+    config?: { key: string; value: any };
 }
 
 interface ServerMessage {
     type: 'text' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'status' | 'welcome'
-    | 'logs' | 'log_line' | 'memories' | 'tools_list';
+    | 'logs' | 'log_line' | 'memories' | 'tools_list' | 'config' | 'config_updated';
     [key: string]: any;
 }
 
@@ -156,6 +157,16 @@ export class WebServer {
                     this.sendTools(ws);
                     break;
 
+                case 'get_config':
+                    this.sendConfig(ws);
+                    break;
+
+                case 'update_config':
+                    if (msg.config) {
+                        this.handleUpdateConfig(ws, msg.config);
+                    }
+                    break;
+
                 case 'chat':
                     if (!msg.message || !msg.message.trim()) {
                         this.send(ws, { type: 'error', message: 'Empty message' });
@@ -275,6 +286,74 @@ export class WebServer {
             };
         });
         this.send(ws, { type: 'tools_list', tools: toolList });
+    }
+
+    // ── Config Handlers ──
+
+    private sendConfig(ws: WebSocket) {
+        const providers = ['openai', 'google', 'antigravity', 'groq'] as const;
+        const currentProvider = config.getProvider() || '';
+        const workspace = config.getWorkspace();
+        const waConfig = config.getWhatsAppConfig();
+        const people = config.getPeople();
+
+        const apiKeys: Record<string, boolean> = {};
+        const models: Record<string, string> = {};
+
+        for (const p of providers) {
+            apiKeys[p] = !!config.getApiKey(p);
+            models[p] = config.getDefaultModel(p) || '';
+        }
+
+        this.send(ws, {
+            type: 'config',
+            provider: currentProvider,
+            apiKeys,
+            models,
+            workspace,
+            whatsapp: waConfig || { enabled: false },
+            people: people || [],
+        });
+    }
+
+    private handleUpdateConfig(ws: WebSocket, update: { key: string; value: any }) {
+        try {
+            switch (update.key) {
+                case 'provider':
+                    config.setProvider(update.value);
+                    break;
+                case 'workspace':
+                    config.setWorkspace(update.value);
+                    break;
+                case 'apiKey': {
+                    const { provider, key } = update.value;
+                    config.setApiKey(provider, key);
+                    break;
+                }
+                case 'model': {
+                    const { provider, model } = update.value;
+                    config.setDefaultModel(provider, model);
+                    break;
+                }
+                case 'whatsapp':
+                    config.setWhatsAppConfig(
+                        update.value.enabled,
+                        update.value.allowedNumbers
+                    );
+                    break;
+                default:
+                    this.send(ws, { type: 'error', message: `Unknown config key: ${update.key}` });
+                    return;
+            }
+            logger.info(`Config updated: ${update.key}`);
+            this.send(ws, { type: 'config_updated', key: update.key, success: true });
+            // Send refreshed config
+            this.sendConfig(ws);
+            // Also refresh status since provider/model may have changed
+            this.sendStatus(ws);
+        } catch (err: any) {
+            this.send(ws, { type: 'error', message: `Config update failed: ${err.message}` });
+        }
     }
 
     // ── Chat Handler (Agentic Loop) ──

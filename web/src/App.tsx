@@ -6,6 +6,7 @@ import BottomPanel from './components/BottomPanel';
 import LogsView from './components/LogsView';
 import MemoryView from './components/MemoryView';
 import ToolsView from './components/ToolsView';
+import SettingsView from './components/SettingsView';
 import { useWebSocket, type NavPage } from './hooks/useWebSocket';
 
 export default function App() {
@@ -18,6 +19,8 @@ export default function App() {
       <TopPanel
         isConnected={ws.isConnected}
         agentStatus={ws.agentStatus}
+        onNavigate={setActivePage}
+        activePage={activePage}
       />
 
       {/* Body: Side + Main/Bottom */}
@@ -66,6 +69,14 @@ export default function App() {
             <ToolsView
               toolDetails={ws.toolDetails}
               onRequestTools={ws.requestTools}
+            />
+          )}
+
+          {activePage === 'settings' && (
+            <SettingsView
+              config={ws.agentConfig}
+              onRequestConfig={ws.requestConfig}
+              onUpdateConfig={ws.updateConfig}
             />
           )}
 

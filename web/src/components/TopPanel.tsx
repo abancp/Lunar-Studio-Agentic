@@ -8,14 +8,16 @@ import {
     Wifi,
     WifiOff,
 } from 'lucide-react';
-import type { AgentStatus } from '../hooks/useWebSocket';
+import type { AgentStatus, NavPage } from '../hooks/useWebSocket';
 
 interface TopPanelProps {
     isConnected: boolean;
     agentStatus: AgentStatus | null;
+    onNavigate: (page: NavPage) => void;
+    activePage: NavPage;
 }
 
-export default function TopPanel({ isConnected, agentStatus }: TopPanelProps) {
+export default function TopPanel({ isConnected, agentStatus, onNavigate, activePage }: TopPanelProps) {
     const provider = agentStatus?.provider || '—';
     const model = agentStatus?.model || '—';
 
@@ -23,7 +25,7 @@ export default function TopPanel({ isConnected, agentStatus }: TopPanelProps) {
         <header className="h-16 glass-panel-solid rounded-xl flex items-center justify-between px-6 z-20 relative shrink-0">
             {/* Left — Branding */}
             <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center shadow-lg">
+                <div className="w-9 h-9 rounded-lg bg-linear-to-br from-accent-primary to-accent-secondary flex items-center justify-center shadow-lg">
                     <Moon size={17} className="text-white" />
                 </div>
                 <div className="flex flex-col leading-tight">
@@ -47,7 +49,10 @@ export default function TopPanel({ isConnected, agentStatus }: TopPanelProps) {
                 </div>
 
                 {/* Provider Badge */}
-                <button className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-bg-tertiary/60 border border-border-default hover:border-border-hover transition-colors cursor-pointer group">
+                <button
+                    onClick={() => onNavigate('settings')}
+                    className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-bg-tertiary/60 border border-border-default hover:border-border-hover transition-colors cursor-pointer group"
+                >
                     <Cpu size={12} className="text-accent-primary-light" />
                     <span className="text-xs text-text-secondary font-medium group-hover:text-text-primary transition-colors capitalize">
                         {provider}
@@ -80,12 +85,18 @@ export default function TopPanel({ isConnected, agentStatus }: TopPanelProps) {
                 <button className="p-2.5 rounded-lg hover:bg-bg-hover transition-colors text-text-secondary hover:text-text-primary cursor-pointer">
                     <Bell size={16} />
                 </button>
-                <button className="p-2.5 rounded-lg hover:bg-bg-hover transition-colors text-text-secondary hover:text-text-primary cursor-pointer">
+                <button
+                    onClick={() => onNavigate('settings')}
+                    className={`p-2.5 rounded-lg transition-colors cursor-pointer ${activePage === 'settings'
+                            ? 'bg-accent-primary/12 text-accent-primary-light'
+                            : 'hover:bg-bg-hover text-text-secondary hover:text-text-primary'
+                        }`}
+                >
                     <Settings size={16} />
                 </button>
 
                 {/* Avatar */}
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-accent-primary/30 to-accent-secondary/30 border border-border-default ml-2 flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-linear-to-br from-accent-primary/30 to-accent-secondary/30 border border-border-default ml-2 flex items-center justify-center">
                     <span className="text-xs font-semibold text-accent-primary-light">
                         A
                     </span>
