@@ -169,3 +169,81 @@ body,
   background: rgba(108, 92, 231, 0.3);
   color: #fff;
 }
+
+/* ─── Highlight.js Syntax Theme ─── */
+.hljs {
+  color: #e4e4e7;
+  background: transparent;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name {
+  color: #c792ea;
+}
+
+.hljs-string,
+.hljs-attr,
+.hljs-addition {
+  color: #c3e88d;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #636d83;
+  font-style: italic;
+}
+
+.hljs-number,
+.hljs-literal {
+  color: #f78c6c;
+}
+
+.hljs-function .hljs-title,
+.hljs-title.function_ {
+  color: #82aaff;
+}
+
+.hljs-type,
+.hljs-title.class_ {
+  color: #ffcb6b;
+}
+
+.hljs-variable,
+.hljs-template-variable {
+  color: #f07178;
+}
+
+.hljs-regexp {
+  color: #89ddff;
+}
+
+.hljs-meta {
+  color: #ffcb6b;
+}
+
+.hljs-deletion {
+  color: #ef4444;
+}
+
+.hljs-symbol,
+.hljs-bullet {
+  color: #89ddff;
+}
+
+.hljs-params {
+  color: #e4e4e7;
+}
+
+.hljs-attr {
+  color: #ffcb6b;
+}
+
+.hljs-property {
+  color: #82aaff;
+}
+
+.hljs-punctuation {
+  color: #89ddff;
+}

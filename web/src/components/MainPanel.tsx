@@ -11,9 +11,53 @@ import {
     ArrowDown,
     ChevronDown,
     Layers,
+    Check,
+    Clipboard,
 } from 'lucide-react';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
 import type { ChatMessage, ToolCallInfo, AgentStatus } from '../hooks/useWebSocket';
+
+// ── Code block with copy button ──
+
+function CodeBlock({ className, children }: { className?: string; children?: React.ReactNode }) {
+    const [copied, setCopied] = useState(false);
+    const lang = className?.replace('hljs language-', '')?.replace('language-', '') || '';
+    const code = String(children).replace(/\n$/, '');
+
+    const handleCopy = useCallback(() => {
+        navigator.clipboard.writeText(code);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    }, [code]);
+
+    return (
+        <div className="my-3 rounded-xl overflow-hidden border border-border-default bg-bg-primary/80 group/code">
+            {/* Code header */}
+            <div className="flex items-center justify-between px-4 py-2 bg-bg-tertiary/50 border-b border-border-default/60">
+                <span className="text-[10px] font-mono text-text-muted uppercase tracking-wider">
+                    {lang || 'code'}
+                </span>
+                <button
+                    onClick={handleCopy}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] text-text-muted hover:text-text-primary hover:bg-bg-hover transition-all cursor-pointer"
+                >
+                    {copied ? (
+                        <><Check size={10} className="text-success" /> Copied</>
+                    ) : (
+                        <><Clipboard size={10} /> Copy</>
+                    )}
+                </button>
+            </div>
+            {/* Code content */}
+            <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed">
+                <code className={className}>{children}</code>
+            </pre>
+        </div>
+    );
+}
 
 // ── Single tool row inside the stack ──
 
@@ -72,7 +116,6 @@ function ToolCallStack({ tools }: { tools: ToolCallInfo[] }) {
 
     return (
         <div className="my-3 rounded-xl border border-border-default bg-bg-tertiary/40 overflow-hidden animate-fade-in">
-            {/* Stack header */}
             <div className="flex items-center gap-2.5 px-4 py-2 bg-bg-tertiary/60 border-b border-border-default/60">
                 <div className="w-5 h-5 rounded-md bg-accent-primary/15 flex items-center justify-center">
                     {tools.length > 1 ? (
@@ -99,12 +142,72 @@ function ToolCallStack({ tools }: { tools: ToolCallInfo[] }) {
                     )}
                 </div>
             </div>
-
-            {/* Tool rows */}
             {tools.map((tool, i) => (
                 <ToolCallRow key={i} tool={tool} isLast={i === tools.length - 1} />
             ))}
         </div>
+    );
+}
+
+// ── Markdown renderer for assistant messages ──
+
+function MarkdownContent({ content }: { content: string }) {
+    return (
+        <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeHighlight]}
+            components={{
+                // Code blocks
+                code({ className, children, ...props }) {
+                    const isBlock = className?.includes('language-') || className?.includes('hljs');
+                    if (isBlock) {
+                        return <CodeBlock className={className}>{children}</CodeBlock>;
+                    }
+                    return (
+                        <code className="px-1.5 py-0.5 rounded-md bg-bg-primary/70 font-mono text-[12px] text-accent-primary-light border border-border-default/40" {...props}>
+                            {children}
+                        </code>
+                    );
+                },
+                pre({ children }) {
+                    // Unwrap pre since CodeBlock handles its own wrapper
+                    return <>{children}</>;
+                },
+                // Headings
+                h1({ children }) { return <h1 className="text-lg font-bold text-text-primary mt-5 mb-2">{children}</h1>; },
+                h2({ children }) { return <h2 className="text-base font-bold text-text-primary mt-4 mb-2">{children}</h2>; },
+                h3({ children }) { return <h3 className="text-sm font-bold text-text-primary mt-3 mb-1.5">{children}</h3>; },
+                h4({ children }) { return <h4 className="text-sm font-semibold text-text-primary mt-2 mb-1">{children}</h4>; },
+                // Paragraphs
+                p({ children }) { return <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>; },
+                // Lists
+                ul({ children }) { return <ul className="list-disc list-outside ml-5 mb-3 space-y-1">{children}</ul>; },
+                ol({ children }) { return <ol className="list-decimal list-outside ml-5 mb-3 space-y-1">{children}</ol>; },
+                li({ children }) { return <li className="text-text-primary leading-relaxed">{children}</li>; },
+                // Bold / Italic
+                strong({ children }) { return <strong className="font-semibold text-text-primary">{children}</strong>; },
+                em({ children }) { return <em className="italic text-text-secondary">{children}</em>; },
+                // Links
+                a({ href, children }) {
+                    return <a href={href} target="_blank" rel="noopener noreferrer" className="text-accent-primary-light underline underline-offset-2 hover:text-accent-primary transition-colors">{children}</a>;
+                },
+                // Blockquotes
+                blockquote({ children }) {
+                    return <blockquote className="border-l-3 border-accent-primary/40 pl-4 my-3 text-text-secondary italic">{children}</blockquote>;
+                },
+                // Horizontal rule
+                hr() { return <hr className="border-border-default/50 my-4" />; },
+                // Tables
+                table({ children }) { return <div className="overflow-x-auto my-3 rounded-lg border border-border-default"><table className="w-full text-xs">{children}</table></div>; },
+                thead({ children }) { return <thead className="bg-bg-tertiary/50">{children}</thead>; },
+                tbody({ children }) { return <tbody className="divide-y divide-border-default/50">{children}</tbody>; },
+                tr({ children }) { return <tr className="hover:bg-bg-hover/30 transition-colors">{children}</tr>; },
+                th({ children }) { return <th className="px-3 py-2 text-left text-[11px] font-semibold text-text-secondary uppercase tracking-wider">{children}</th>; },
+                td({ children }) { return <td className="px-3 py-2 text-text-primary">{children}</td>; },
+            }}
+        >
+            {content}
+        </ReactMarkdown>
     );
 }
 
@@ -115,14 +218,13 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
     return (
         <div
-            className={`flex gap-4 animate-fade-in ${isUser ? 'flex-row-reverse' : ''
-                }`}
+            className={`flex gap-4 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}`}
         >
             {/* Avatar */}
             <div
                 className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center mt-1 ${isUser
-                        ? 'bg-accent-primary/15 border border-accent-primary/20'
-                        : 'bg-accent-secondary/10 border border-accent-secondary/15'
+                    ? 'bg-accent-primary/15 border border-accent-primary/20'
+                    : 'bg-accent-secondary/10 border border-accent-secondary/15'
                     }`}
             >
                 {isUser ? (
@@ -133,38 +235,19 @@ function MessageBubble({ message }: { message: ChatMessage }) {
             </div>
 
             {/* Content */}
-            <div className={`flex flex-col max-w-[72%] ${isUser ? 'items-end' : ''}`}>
+            <div className={`flex flex-col max-w-[75%] ${isUser ? 'items-end' : ''}`}>
                 {message.content && (
                     <div
-                        className={`px-5 py-3.5 rounded-2xl text-sm leading-relaxed ${isUser
-                                ? 'bg-accent-primary/12 border border-accent-primary/15 text-text-primary rounded-tr-sm'
-                                : 'bg-bg-tertiary/60 border border-border-default text-text-primary rounded-tl-sm'
+                        className={`rounded-2xl text-sm overflow-hidden ${isUser
+                            ? 'bg-accent-primary/12 border border-accent-primary/15 text-text-primary rounded-tr-sm px-5 py-3.5'
+                            : 'bg-bg-tertiary/60 border border-border-default text-text-primary rounded-tl-sm px-5 py-4'
                             }`}
                     >
-                        {message.content.split('\n').map((line, i) => (
-                            <p key={i} className={i > 0 ? 'mt-2' : ''}>
-                                {line.split(/(\*\*[^*]+\*\*)/).map((part, j) => {
-                                    if (part.startsWith('**') && part.endsWith('**')) {
-                                        return (
-                                            <strong key={j} className="font-semibold text-text-primary">
-                                                {part.slice(2, -2)}
-                                            </strong>
-                                        );
-                                    }
-                                    if (part.startsWith('`') && part.endsWith('`')) {
-                                        return (
-                                            <code
-                                                key={j}
-                                                className="px-1.5 py-0.5 rounded bg-bg-primary/60 font-mono text-xs text-accent-primary-light"
-                                            >
-                                                {part.slice(1, -1)}
-                                            </code>
-                                        );
-                                    }
-                                    return <span key={j}>{part}</span>;
-                                })}
-                            </p>
-                        ))}
+                        {isUser ? (
+                            <p className="leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                        ) : (
+                            <MarkdownContent content={message.content} />
+                        )}
                     </div>
                 )}
 
@@ -174,10 +257,7 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                 )}
 
                 {/* Meta */}
-                <div
-                    className={`flex items-center gap-2 mt-2 px-2 ${isUser ? 'flex-row-reverse' : ''
-                        }`}
-                >
+                <div className={`flex items-center gap-2 mt-2 px-2 ${isUser ? 'flex-row-reverse' : ''}`}>
                     <span className="text-[10px] text-text-muted font-mono">
                         {message.timestamp}
                     </span>
