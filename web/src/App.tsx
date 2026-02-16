@@ -12,6 +12,7 @@ import { useWebSocket, type NavPage } from './hooks/useWebSocket';
 export default function App() {
   const ws = useWebSocket();
   const [activePage, setActivePage] = useState<NavPage>('chat');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   return (
     <div className="h-screen w-screen bg-bg-primary p-2 flex flex-col gap-2 overflow-hidden">
@@ -19,8 +20,7 @@ export default function App() {
       <TopPanel
         isConnected={ws.isConnected}
         agentStatus={ws.agentStatus}
-        onNavigate={setActivePage}
-        activePage={activePage}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
       {/* Body: Side + Main/Bottom */}
@@ -32,7 +32,7 @@ export default function App() {
           onNavigate={setActivePage}
         />
 
-        {/* Main Content Area — changes based on active page */}
+        {/* Main Content Area */}
         <div className="flex flex-col flex-1 min-w-0 min-h-0 gap-2">
           {activePage === 'chat' && (
             <>
@@ -72,14 +72,6 @@ export default function App() {
             />
           )}
 
-          {activePage === 'settings' && (
-            <SettingsView
-              config={ws.agentConfig}
-              onRequestConfig={ws.requestConfig}
-              onUpdateConfig={ws.updateConfig}
-            />
-          )}
-
           {activePage === 'apps' && (
             <main className="flex-1 flex flex-col items-center justify-center min-h-0 glass-panel-solid rounded-xl">
               <p className="text-text-muted text-sm">Apps coming soon...</p>
@@ -87,6 +79,15 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {/* Settings Modal (overlay) */}
+      <SettingsView
+        isOpen={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        config={ws.agentConfig}
+        onRequestConfig={ws.requestConfig}
+        onUpdateConfig={ws.updateConfig}
+      />
     </div>
   );
 }

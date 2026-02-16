@@ -8,16 +8,15 @@ import {
     Wifi,
     WifiOff,
 } from 'lucide-react';
-import type { AgentStatus, NavPage } from '../hooks/useWebSocket';
+import type { AgentStatus } from '../hooks/useWebSocket';
 
 interface TopPanelProps {
     isConnected: boolean;
     agentStatus: AgentStatus | null;
-    onNavigate: (page: NavPage) => void;
-    activePage: NavPage;
+    onOpenSettings: () => void;
 }
 
-export default function TopPanel({ isConnected, agentStatus, onNavigate, activePage }: TopPanelProps) {
+export default function TopPanel({ isConnected, agentStatus, onOpenSettings }: TopPanelProps) {
     const provider = agentStatus?.provider || '—';
     const model = agentStatus?.model || '—';
 
@@ -50,7 +49,7 @@ export default function TopPanel({ isConnected, agentStatus, onNavigate, activeP
 
                 {/* Provider Badge */}
                 <button
-                    onClick={() => onNavigate('settings')}
+                    onClick={onOpenSettings}
                     className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-bg-tertiary/60 border border-border-default hover:border-border-hover transition-colors cursor-pointer group"
                 >
                     <Cpu size={12} className="text-accent-primary-light" />
@@ -86,11 +85,8 @@ export default function TopPanel({ isConnected, agentStatus, onNavigate, activeP
                     <Bell size={16} />
                 </button>
                 <button
-                    onClick={() => onNavigate('settings')}
-                    className={`p-2.5 rounded-lg transition-colors cursor-pointer ${activePage === 'settings'
-                            ? 'bg-accent-primary/12 text-accent-primary-light'
-                            : 'hover:bg-bg-hover text-text-secondary hover:text-text-primary'
-                        }`}
+                    onClick={onOpenSettings}
+                    className="p-2.5 rounded-lg hover:bg-bg-hover transition-colors text-text-secondary hover:text-text-primary cursor-pointer"
                 >
                     <Settings size={16} />
                 </button>
