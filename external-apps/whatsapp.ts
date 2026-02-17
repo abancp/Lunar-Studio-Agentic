@@ -38,14 +38,17 @@ function createSendFileTool(client: any, msg: WAMessage): Tool {
                 }
 
                 const fileName = path.basename(absPath);
+                const ext = path.extname(absPath).toLowerCase();
+                const isMedia = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.mp4', '.mov', '.avi', '.mkv', '.3gp'].includes(ext);
+
                 const media = MessageMedia.fromFilePath(absPath);
                 media.filename = fileName;
                 const chat = await msg.getChat();
                 await chat.sendMessage(media, {
-                    caption: caption || fileName,
-                    sendMediaAsDocument: true,
+                    caption: caption || (isMedia ? undefined : fileName),
+                    sendMediaAsDocument: !isMedia,
                 });
-                logger.info(`Sent file to ${msg.from}: ${absPath}`);
+                logger.info(`Sent ${isMedia ? 'media' : 'file'} to ${msg.from}: ${absPath}`);
                 return `File sent successfully: ${path.basename(absPath)}`;
             } catch (error: any) {
                 logger.error(`Failed to send file ${filePath}: ${error.message}`);
@@ -177,23 +180,31 @@ export class WhatsAppService {
         const personId = this.memoryManager.resolvePersonId(chatId);
         const hasMemory = personId !== null;
 
+        if (hasMemory) {
+            const people = config.getPeople();
+            const person = people.find((p) => p.id === personId);
+            logger.info(`Recognized person: ${person?.name || personId} (${person?.relation || 'unknown'}) from ${chatId}`);
+        } else {
+            logger.info(`Unknown contact: ${chatId} — no memory management`);
+        }
+
+        // Build system prompt — always refresh with latest memories each message
+        let systemPrompt: string;
+        if (hasMemory) {
+            const memoryContext = this.memoryManager.getContextString(personId!, msg.body);
+            systemPrompt = buildSystemPrompt(memoryContext);
+        } else {
+            systemPrompt = AGENTIC_SYSTEM_PROMPT;
+        }
+
         // Get or Create History for this chat
         let history = this.historyManagers.get(chatId);
         if (!history) {
-            let systemPrompt: string;
-            if (hasMemory) {
-                const memoryContext = this.memoryManager.getContextString(personId!, msg.body);
-                systemPrompt = buildSystemPrompt(memoryContext);
-            } else {
-                systemPrompt = AGENTIC_SYSTEM_PROMPT;
-            }
             history = new HistoryManager(systemPrompt);
             this.historyManagers.set(chatId, history);
-        } else if (hasMemory) {
-            const memoryContext = this.memoryManager.getContextString(personId!, msg.body);
-            if (memoryContext) {
-                history.addSystemMessage(buildSystemPrompt(memoryContext));
-            }
+        } else {
+            // Always update system prompt with fresh memory context
+            history.addSystemMessage(systemPrompt);
         }
 
         history.addUserMessage(msg.body);

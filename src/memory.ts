@@ -108,14 +108,34 @@ export class MemoryManager {
 
     /**
      * Build a context string of relevant memories for injection into system prompt.
-     * Includes accessible memories + people info.
+     * Includes current person identity, accessible memories + people info.
      * Max 5 recent + 3 keyword-matched.
      */
     getContextString(personId: string, query?: string): string {
+        const people = getPeople();
+        const currentPerson = people.find(p => p.id === personId);
+
+        let result = '';
+
+        // ── Current person identification ──
+        if (currentPerson) {
+            result += `\nCURRENT USER:\nYou are currently talking to ${currentPerson.name} (${currentPerson.relation}).`;
+            if (currentPerson.notes) {
+                result += ` Notes: ${currentPerson.notes}`;
+            }
+            result += `\nAddress them by name naturally. Remember their preferences and history.\n`;
+        }
+
+        // ── People context ──
+        const peopleInfo = this.getPeopleContext();
+        if (peopleInfo) {
+            result += peopleInfo;
+        }
+
+        // ── Memories ──
         const recent = this.getAccessibleMemories(personId, personId, 5);
         let searchHits: Memory[] = [];
         if (query) {
-            // Search within accessible memories
             const allAccessible = this.getAccessibleMemories(personId, personId, 100);
             const words = query.toLowerCase().split(/\s+/);
             const scored = allAccessible.map(m => {
@@ -130,7 +150,7 @@ export class MemoryManager {
                 .map(s => s.memory);
         }
 
-        // Also include owner's memories about this person (for WhatsApp context)
+        // Owner's memories about this person
         const ownerMemories = personId !== 'owner'
             ? this.getAccessibleMemories(personId, 'owner', 5)
             : [];
@@ -143,14 +163,6 @@ export class MemoryManager {
                 seen.add(m.id);
                 combined.push(m);
             }
-        }
-
-        let result = '';
-
-        // Add people context
-        const peopleInfo = this.getPeopleContext();
-        if (peopleInfo) {
-            result += peopleInfo;
         }
 
         if (combined.length > 0) {
