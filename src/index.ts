@@ -2,6 +2,8 @@ import { logger } from './log.js';
 import { WhatsAppService } from '../external-apps/whatsapp.js';
 import { WebServer } from './server.js';
 import * as config from './cli/config.js';
+import { scheduler } from './cronjobs.js';
+import { getTool } from '../tools/index.js';
 
 export async function startDaemon() {
     logger.info('Starting Lunar Studio Agent Daemon...');
@@ -18,7 +20,10 @@ export async function startDaemon() {
     const webServer = new WebServer(3210);
     await webServer.start();
 
-    // 3. Start WhatsApp Service
+    // 3. Initialize Scheduler
+    scheduler.initialize(getTool);
+
+    // 4. Start WhatsApp Service
     const waConfig = config.getWhatsAppConfig();
     if (waConfig && waConfig.enabled) {
         const whatsapp = new WhatsAppService();

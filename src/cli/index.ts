@@ -4,6 +4,7 @@ import { setupCommand } from './setup.js';
 import { chatCommand } from './chat.js';
 import { listModelsCommand } from './list-models.js';
 import { memoriesCommand } from './memories.js';
+import { schedulerCommand } from './scheduler.js';
 
 const program = new Command();
 
@@ -32,6 +33,8 @@ program
     .description('View stored memories')
     .option('-p, --person <name>', 'Filter by person name (or "owner")')
     .action((options) => memoriesCommand(options));
+
+schedulerCommand(program);
 
 program
     .command('daemon')

@@ -3,11 +3,17 @@ import { Tool } from '../llm/types.js';
 import { workspaceTools } from './workspace.js';
 import { diagramTool } from './diagram.js';
 import { animationTool } from './animation.js';
+import { sendWhatsAppTool } from './whatsapp_send.js';
+import { scheduleTool, listScheduledTasksTool, cancelScheduledTaskTool } from './scheduler.js';
 
 export const tools: Tool[] = [
     ...workspaceTools,
     diagramTool,
     animationTool,
+    sendWhatsAppTool,
+    scheduleTool,
+    listScheduledTasksTool,
+    cancelScheduledTaskTool,
     {
         name: 'calculator',
         description: 'Perform simple calculations',

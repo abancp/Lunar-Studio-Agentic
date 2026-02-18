@@ -58,6 +58,8 @@ function createSendFileTool(client: any, msg: WAMessage): Tool {
     };
 }
 
+import { setActiveWhatsAppClient } from './client_instance.js';
+
 export class WhatsAppService {
     private client: any;
     private enabled: boolean = false;
@@ -86,6 +88,7 @@ export class WhatsAppService {
                 args: ['--no-sandbox', '--disable-setuid-sandbox'],
             }
         });
+        setActiveWhatsAppClient(this.client);
 
         this.registerEvents();
     }
@@ -171,6 +174,7 @@ export class WhatsAppService {
 
         if (!msg.body.startsWith(TO_AI_COMMAND) && !this.aiEnabledNumbers[chatId]) {
             logger.info(`Message from ${chatId} does not start with hotword or ai chat not started. Ignoring.`);
+            logger.info(`Message ${msg.body}`);
             return;
         }
 

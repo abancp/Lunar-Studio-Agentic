@@ -21,6 +21,16 @@ interface ConfigSchema {
         hotword?: string;
     };
     people?: Person[];
+    jobs?: ScheduledJob[];
+}
+
+export interface ScheduledJob {
+    id: string;
+    type: 'cron' | 'date';
+    value: string; // cron expression or ISO date string
+    tool: string;
+    args: any;
+    createdAt: number;
 }
 
 export interface Person {
@@ -84,12 +94,38 @@ export const setWhatsAppConfig = (enabled: boolean, allowedNumbers?: string[]) =
 };
 
 
+let peopleOverride: Person[] | null = null;
+
+export const setPeopleOverride = (people: Person[] | null) => {
+    peopleOverride = people;
+};
+
 export const getPeople = (): Person[] => {
+    if (peopleOverride) return peopleOverride;
     return config.get('people') || [];
 };
 
 export const setPeople = (people: Person[]) => {
     config.set('people', people);
+};
+
+let jobsOverride: ScheduledJob[] | null = null;
+
+export const setJobsOverride = (jobs: ScheduledJob[] | null) => {
+    jobsOverride = jobs;
+};
+
+export const getJobs = (): ScheduledJob[] => {
+    if (jobsOverride) return jobsOverride;
+    return config.get('jobs') || [];
+};
+
+export const setJobs = (jobs: ScheduledJob[]) => {
+    if (jobsOverride) {
+        jobsOverride = jobs;
+        return;
+    }
+    config.set('jobs', jobs);
 };
 
 export const clearConfig = (): void => {
