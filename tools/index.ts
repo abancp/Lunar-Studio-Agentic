@@ -2,10 +2,12 @@ import { z } from 'zod';
 import { Tool } from '../llm/types.js';
 import { workspaceTools } from './workspace.js';
 import { diagramTool } from './diagram.js';
+import { animationTool } from './animation.js';
 
 export const tools: Tool[] = [
     ...workspaceTools,
     diagramTool,
+    animationTool,
     {
         name: 'calculator',
         description: 'Perform simple calculations',
