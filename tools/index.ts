@@ -5,6 +5,7 @@ import { diagramTool } from './diagram.js';
 import { animationTool } from './animation.js';
 import { sendWhatsAppTool } from './whatsapp_send.js';
 import { scheduleTool, listScheduledTasksTool, cancelScheduledTaskTool } from './scheduler.js';
+import { documentGeneratorTool } from './document_generator.js';
 
 export const tools: Tool[] = [
     ...workspaceTools,
@@ -14,6 +15,7 @@ export const tools: Tool[] = [
     scheduleTool,
     listScheduledTasksTool,
     cancelScheduledTaskTool,
+    documentGeneratorTool,
     {
         name: 'calculator',
         description: 'Perform simple calculations',

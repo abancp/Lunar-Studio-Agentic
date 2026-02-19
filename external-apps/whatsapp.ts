@@ -4,6 +4,11 @@ import qrcode from 'qrcode-terminal';
 import fs from 'fs';
 import path from 'path';
 import { z } from 'zod';
+import { createRequire } from 'module';
+import mammoth from 'mammoth';
+
+const require = createRequire(import.meta.url);
+const pdf = require('pdf-parse');
 import { logger } from '../src/log.js';
 import * as config from '../src/cli/config.js';
 import { createLLM } from '../llm/factory.js';
@@ -58,6 +63,23 @@ function createSendFileTool(client: any, msg: WAMessage): Tool {
     };
 }
 
+function createReadFileTool(fileContexts: Map<string, string>): Tool {
+    return {
+        name: 'read_whatsapp_file',
+        description: 'Read the full content of a file received via WhatsApp. Use this when the user asks specifically about a file content or when the snippet is not enough.',
+        schema: z.object({
+            fileId: z.string().describe('The ID of the file to read (provided in the file received message)'),
+        }),
+        execute: async ({ fileId }: { fileId: string }) => {
+            const content = fileContexts.get(fileId);
+            if (!content) {
+                return "Error: File content not found or expired. The file might have been received in a previous session or is too old.";
+            }
+            return content;
+        }
+    };
+}
+
 import { setActiveWhatsAppClient } from './client_instance.js';
 
 export class WhatsAppService {
@@ -69,6 +91,8 @@ export class WhatsAppService {
     private hotword?: string;
     private aiEnabledNumbers: Record<string, boolean> = {};
     private memoryManager: MemoryManager;
+    // Map<FileID, Content>
+    private fileContexts: Map<string, string> = new Map();
 
     constructor() {
         this.startTime = Math.floor(Date.now() / 1000);
@@ -178,7 +202,15 @@ export class WhatsAppService {
             return;
         }
 
-        logger.info(`Received WhatsApp message from ${chatId}: ${msg.body}`);
+        // Handle Media
+        const mediaSummary = await this.handleMedia(msg);
+        let userMessage = msg.body;
+        if (mediaSummary) {
+            userMessage += `\n\n${mediaSummary}`;
+            logger.info(`Processed media for ${chatId}`);
+        }
+
+        logger.info(`Received WhatsApp message from ${chatId}: ${userMessage}`);
 
         // Resolve person ID — only configured people get memories
         const personId = this.memoryManager.resolvePersonId(chatId);
@@ -195,7 +227,8 @@ export class WhatsAppService {
         // Build system prompt — always refresh with latest memories each message
         let systemPrompt: string;
         if (hasMemory) {
-            const memoryContext = this.memoryManager.getContextString(personId!, msg.body);
+            // Use userMessage which might contain file context
+            const memoryContext = this.memoryManager.getContextString(personId!, userMessage);
             systemPrompt = buildSystemPrompt(memoryContext);
         } else {
             systemPrompt = AGENTIC_SYSTEM_PROMPT;
@@ -211,7 +244,7 @@ export class WhatsAppService {
             history.addSystemMessage(systemPrompt);
         }
 
-        history.addUserMessage(msg.body);
+        history.addUserMessage(userMessage);
 
         const providerName = config.getProvider() || 'google';
         const apiKey = config.getApiKey(providerName);
@@ -230,6 +263,7 @@ export class WhatsAppService {
             const waTools: Tool[] = [
                 ...baseTools,
                 createSendFileTool(this.client, msg),
+                createReadFileTool(this.fileContexts), // Inject read tool
             ];
 
             let keepGenerating = true;
@@ -290,6 +324,53 @@ export class WhatsAppService {
         } catch (error: any) {
             logger.error(`LLM Error processing message: ${error.message}`);
             await msg.reply("I encountered an error processing your request.");
+        }
+    }
+
+    private async handleMedia(msg: WAMessage): Promise<string | null> {
+        if (!msg.hasMedia) return null;
+
+        try {
+            const media = await msg.downloadMedia();
+            if (!media) return null;
+
+            // Calculate size in MB (approximate from base64)
+            const sizeInBytes = (media.data.length * 3) / 4;
+            const sizeInMB = sizeInBytes / (1024 * 1024);
+
+            if (sizeInMB > 5) {
+                return `[File skipped: ${media.filename || 'Unknown'} (Too large: ${sizeInMB.toFixed(2)}MB)]`;
+            }
+
+            let content = "";
+            const buffer = Buffer.from(media.data, 'base64');
+            const mimeType = media.mimetype;
+
+            if (mimeType === 'application/pdf') {
+                const data = await pdf(buffer);
+                content = data.text;
+            } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                const result = await mammoth.extractRawText({ buffer });
+                content = result.value;
+            } else if (mimeType.startsWith('text/')) {
+                content = buffer.toString('utf-8');
+            } else {
+                return null; // Unsupported type for text extraction
+            }
+
+            if (!content || content.trim().length === 0) return null;
+
+            // Store content
+            // Usage: unique ID for the file. msg.id.id is unique.
+            const fileId = msg.id.id;
+            this.fileContexts.set(fileId, content);
+
+            const preview = content.substring(0, 200).replace(/\n/g, ' ');
+            return `[File Received: ${media.filename || 'Untitled'} (ID: ${fileId}) - Type: ${mimeType}]\nSnippet: ${preview}...`;
+
+        } catch (error: any) {
+            logger.error(`Error processing media from ${msg.from}: ${error.message}`);
+            return `[Error reading file: ${error.message}]`;
         }
     }
 }
