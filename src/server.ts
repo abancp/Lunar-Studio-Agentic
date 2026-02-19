@@ -5,6 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { logger, getLogPath } from './log.js';
 import * as config from './cli/config.js';
 import { createLLM } from '../llm/factory.js';
+import { WhatsAppService } from '../external-apps/whatsapp.js';
 import { tools, getTool } from '../tools/index.js';
 import { HistoryManager } from './cli/history.js';
 import { buildSystemPrompt } from '../llm/system.js';
@@ -15,14 +16,17 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 // ── WebSocket Message Types ──
 
 interface ClientMessage {
-    type: 'chat' | 'stop' | 'get_status' | 'get_logs' | 'get_memories' | 'get_tools' | 'get_config' | 'update_config';
+    type: 'chat' | 'stop' | 'get_status' | 'get_logs' | 'get_memories' | 'get_tools' | 'get_config' | 'update_config'
+    | 'get_sessions' | 'get_history' | 'clear_history' | 'pop_history';
     message?: string;
     config?: { key: string; value: any };
+    chatId?: string;
 }
 
 interface ServerMessage {
     type: 'text' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'status' | 'welcome'
-    | 'logs' | 'log_line' | 'memories' | 'tools_list' | 'config' | 'config_updated';
+    | 'logs' | 'log_line' | 'memories' | 'tools_list' | 'config' | 'config_updated'
+    | 'sessions' | 'history' | 'history_cleared' | 'history_popped';
     [key: string]: any;
 }
 
@@ -50,9 +54,11 @@ export class WebServer {
     private port: number;
     private staticDir: string;
     private memoryManager: MemoryManager;
+    private whatsapp?: WhatsAppService;
 
-    constructor(port: number = 3210) {
+    constructor(port: number = 3210, whatsapp?: WhatsAppService) {
         this.port = port;
+        this.whatsapp = whatsapp;
         this.memoryManager = new MemoryManager();
 
         // Resolve static dir to web/dist relative to project root
@@ -164,6 +170,48 @@ export class WebServer {
                 case 'update_config':
                     if (msg.config) {
                         this.handleUpdateConfig(ws, msg.config);
+                    }
+                    break;
+
+                case 'get_sessions': // Context Management
+                    if (this.whatsapp) {
+                        const sessions = Array.from(this.whatsapp.getHistoryManagers().keys());
+                        this.send(ws, { type: 'sessions', sessions });
+                    } else {
+                        this.send(ws, { type: 'error', message: 'WhatsApp service not active' });
+                    }
+                    break;
+
+                case 'get_history':
+                    if (this.whatsapp && msg.chatId) {
+                        const hist = this.whatsapp.getHistoryManagers().get(msg.chatId);
+                        if (hist) {
+                            this.send(ws, { type: 'history', chatId: msg.chatId, messages: hist.getMessages() });
+                        } else {
+                            this.send(ws, { type: 'error', message: 'History not found' });
+                        }
+                    }
+                    break;
+
+                case 'clear_history':
+                    if (this.whatsapp && msg.chatId) {
+                        const hist = this.whatsapp.getHistoryManagers().get(msg.chatId);
+                        if (hist) {
+                            hist.clear();
+                            this.send(ws, { type: 'history_cleared', chatId: msg.chatId });
+                            logger.info(`Context cleared for ${msg.chatId} via Web/CLI`);
+                        }
+                    }
+                    break;
+
+                case 'pop_history':
+                    if (this.whatsapp && msg.chatId) {
+                        const hist = this.whatsapp.getHistoryManagers().get(msg.chatId);
+                        if (hist) {
+                            hist.pop();
+                            this.send(ws, { type: 'history_popped', chatId: msg.chatId });
+                            logger.info(`Last message popped for ${msg.chatId} via Web/CLI`);
+                        }
                     }
                     break;
 

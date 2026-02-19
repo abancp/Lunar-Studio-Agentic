@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 // ── Types ──
 
-export type NavPage = 'chat' | 'memory' | 'tools' | 'logs' | 'apps' | 'settings';
+export type NavPage = 'chat' | 'memory' | 'tools' | 'logs' | 'apps' | 'settings' | 'context';
 
 export interface ChatMessage {
     id: string;
@@ -68,6 +68,8 @@ export function useWebSocket() {
     const [memories, setMemories] = useState<MemoryEntry[]>([]);
     const [toolDetails, setToolDetails] = useState<ToolDetail[]>([]);
     const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
+    const [sessions, setSessions] = useState<string[]>([]);
+    const [history, setHistory] = useState<{ chatId: string; messages: any[] } | null>(null);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -240,6 +242,27 @@ export function useWebSocket() {
                 case 'config_updated':
                     // Config was updated — will get a fresh 'config' message right after
                     break;
+
+                case 'sessions':
+                    setSessions(msg.sessions || []);
+                    break;
+
+                case 'history':
+                    setHistory({ chatId: msg.chatId, messages: msg.messages });
+                    break;
+
+                case 'history_cleared':
+                    if (history && history.chatId === msg.chatId) {
+                        setHistory({ ...history, messages: [] });
+                    }
+                    break;
+
+                case 'history_popped':
+                    if (history && history.chatId === msg.chatId) {
+                        // refreshing history is best, but we can optimistically pop
+                        setHistory(prev => prev ? { ...prev, messages: prev.messages.slice(0, -1) } : null);
+                    }
+                    break;
             }
         };
     }, []);
@@ -300,6 +323,26 @@ export function useWebSocket() {
         wsRef.current.send(JSON.stringify({ type: 'update_config', config: { key, value } }));
     }, []);
 
+    const requestSessions = useCallback(() => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'get_sessions' }));
+    }, []);
+
+    const requestHistory = useCallback((chatId: string) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'get_history', chatId }));
+    }, []);
+
+    const clearHistory = useCallback((chatId: string) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'clear_history', chatId }));
+    }, []);
+
+    const popHistory = useCallback((chatId: string) => {
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+        wsRef.current.send(JSON.stringify({ type: 'pop_history', chatId }));
+    }, []);
+
     return {
         messages,
         isConnected,
@@ -316,5 +359,11 @@ export function useWebSocket() {
         requestTools,
         requestConfig,
         updateConfig,
+        sessions,
+        history,
+        requestSessions,
+        requestHistory,
+        clearHistory,
+        popHistory,
     };
 }

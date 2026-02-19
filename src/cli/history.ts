@@ -74,4 +74,14 @@ export class HistoryManager {
             this.history.push(system);
         }
     }
+
+    pop() {
+        if (this.history.length > 0) {
+            // Don't pop system prompt at index 0
+            if (this.history.length === 1 && this.history[0]?.role === 'system') {
+                return;
+            }
+            this.history.pop();
+        }
+    }
 }

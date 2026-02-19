@@ -373,4 +373,8 @@ export class WhatsAppService {
             return `[Error reading file: ${error.message}]`;
         }
     }
+
+    public getHistoryManagers(): Map<string, HistoryManager> {
+        return this.historyManagers;
+    }
 }

@@ -6,6 +6,7 @@ import BottomPanel from './components/BottomPanel';
 import LogsView from './components/LogsView';
 import MemoryView from './components/MemoryView';
 import ToolsView from './components/ToolsView';
+import ContextView from './components/ContextView';
 import SettingsView from './components/SettingsView';
 import { useWebSocket, type NavPage } from './hooks/useWebSocket';
 
@@ -69,6 +70,17 @@ export default function App() {
             <ToolsView
               toolDetails={ws.toolDetails}
               onRequestTools={ws.requestTools}
+            />
+          )}
+
+          {activePage === 'context' && (
+            <ContextView
+              sessions={ws.sessions}
+              history={ws.history}
+              requestSessions={ws.requestSessions}
+              requestHistory={ws.requestHistory}
+              clearHistory={ws.clearHistory}
+              popHistory={ws.popHistory}
             />
           )}
 

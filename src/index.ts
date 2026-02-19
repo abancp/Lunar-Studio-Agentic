@@ -16,20 +16,29 @@ export async function startDaemon() {
     }
     logger.info(`LLM Provider: ${provider}`);
 
-    // 2. Start Web UI Server (always runs)
-    const webServer = new WebServer(3210);
-    await webServer.start();
-
-    // 3. Initialize Scheduler
+    // 2. Initialize Scheduler
     scheduler.initialize(getTool);
 
-    // 4. Start WhatsApp Service
+    // 3. Initialize WhatsApp Service (if enabled)
     const waConfig = config.getWhatsAppConfig();
+    let whatsapp: WhatsAppService | undefined;
+
     if (waConfig && waConfig.enabled) {
-        const whatsapp = new WhatsAppService();
-        await whatsapp.initialize();
-    } else {
-        logger.info('WhatsApp service is disabled or not configured.');
+        whatsapp = new WhatsAppService();
+    }
+
+    // 4. Start Web UI Server (always runs)
+    const webServer = new WebServer(3210, whatsapp);
+    await webServer.start();
+
+    // 5. Start WhatsApp (after server is up)
+    if (whatsapp) {
+        // Don't await strictly if we want non-blocking start, or await to keep process alive/clean logs
+        // But since we want the server to be responsive while QR is scanning, we shouldn't await it *before* server start.
+        // We can await it here as the last step.
+        whatsapp.initialize().catch(err => {
+            logger.error(`WhatsApp initialization failed: ${err.message}`);
+        });
     }
 
     logger.info('Daemon is running. Press Ctrl+C to stop.');

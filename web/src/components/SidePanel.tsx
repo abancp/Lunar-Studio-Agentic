@@ -38,6 +38,7 @@ const navItems: NavItem[] = [
     { icon: Brain, label: 'Memory', page: 'memory' },
     { icon: Wrench, label: 'Tools', page: 'tools' },
     { icon: ScrollText, label: 'Logs', page: 'logs' },
+    { icon: MessageSquare, label: 'Context', page: 'context' },
     { icon: Smartphone, label: 'Apps', page: 'apps' },
 ];
 

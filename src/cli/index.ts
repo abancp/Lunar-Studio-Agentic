@@ -5,6 +5,7 @@ import { chatCommand } from './chat.js';
 import { listModelsCommand } from './list-models.js';
 import { memoriesCommand } from './memories.js';
 import { schedulerCommand } from './scheduler.js';
+import { contextCommand } from './context.js';
 
 const program = new Command();
 
@@ -35,6 +36,7 @@ program
     .action((options) => memoriesCommand(options));
 
 schedulerCommand(program);
+contextCommand(program);
 
 program
     .command('daemon')
