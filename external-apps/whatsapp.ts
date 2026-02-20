@@ -140,7 +140,7 @@ export class WhatsAppService {
         });
 
         this.client.on('message_create', async (msg: WAMessage) => {
-            if (msg.fromMe) return;
+            // if (msg.fromMe) return;
             await this.handleMessage(msg);
         });
     }
@@ -162,6 +162,24 @@ export class WhatsAppService {
         logger.info("Starting WhatsApp Setup (QR generation)...");
         this.enabled = true;
         await this.client.initialize();
+    }
+
+    async logout() {
+        logger.info("Logging out from WhatsApp...");
+        try {
+            // Try graceful logout if client is initialized (unlikely in CLI one-off, but good practice)
+            // But main goal is to remove session.
+            const sessionDir = path.join(process.cwd(), '.wwebjs_auth');
+            if (fs.existsSync(sessionDir)) {
+                fs.rmSync(sessionDir, { recursive: true, force: true });
+                logger.info(`Session directory ${sessionDir} removed.`);
+            } else {
+                logger.info("No session directory found.");
+            }
+            console.log("Logged out successfully.");
+        } catch (error: any) {
+            logger.error(`Error logging out: ${error.message}`);
+        }
     }
 
     private async handleMessage(msg: WAMessage) {

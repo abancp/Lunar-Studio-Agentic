@@ -46,4 +46,13 @@ program
         await startDaemon();
     });
 
+program
+    .command('whatsapp-logout')
+    .description('Logout from WhatsApp and clear session')
+    .action(async () => {
+        const { WhatsAppService } = await import('../../external-apps/whatsapp.js');
+        const wa = new WhatsAppService();
+        await wa.logout();
+    });
+
 program.parse(process.argv);
