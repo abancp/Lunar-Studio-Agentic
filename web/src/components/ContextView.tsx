@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 
 interface ContextViewProps {
     sessions: string[];
-    history: { chatId: string; messages: any[] } | null;
+    history: { chatId: string; messages: any[]; tools?: { name: string; description: string }[] } | null;
     requestSessions: () => void;
     requestHistory: (chatId: string) => void;
     clearHistory: (chatId: string) => void;
@@ -108,53 +108,71 @@ export default function ContextView({
                             </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-bg-primary/30">
-                            {(!history || history.messages.length === 0) ? (
-                                <p className="text-xs text-text-muted text-center py-10">Context is empty</p>
-                            ) : (
-                                history.messages.map((msg, idx) => (
-                                    <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`p-1.5 rounded-full h-fit mt-1 shrink-0 
-                                            ${msg.role === 'user' ? 'bg-accent-primary/20 text-accent-primary-light'
-                                                : msg.role === 'assistant' ? 'bg-purple-500/20 text-purple-400'
-                                                    : msg.role === 'system' ? 'bg-amber-500/20 text-amber-400'
-                                                        : 'bg-gray-500/20 text-gray-400'}`}>
-                                            {msg.role === 'user' ? <User size={12} /> : msg.role === 'assistant' ? <Bot size={12} /> : msg.role === 'system' ? <Wrench size={12} /> : <Wrench size={12} />}
-                                        </div>
-                                        <div className={`max-w-[80%] rounded-lg px-3 py-2 text-xs border
-                                            ${msg.role === 'user' ? 'bg-accent-primary/10 border-accent-primary/20 text-text-primary'
-                                                : msg.role === 'assistant' ? 'bg-bg-secondary border-border-default text-text-secondary'
-                                                    : 'bg-bg-tertiary border-border-default text-text-muted font-mono whitespace-pre-wrap'}`}>
 
-                                            {msg.role === 'system' ? (
-                                                <div className="font-mono text-[10px] opacity-80 max-h-32 overflow-y-auto">
-                                                    {msg.content}
-                                                </div>
-                                            ) : (
-                                                <div className="prose prose-invert prose-xs max-w-none">
-                                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                                        {msg.content || ''}
-                                                    </ReactMarkdown>
-                                                </div>
-                                            )}
-
-                                            {msg.tool_calls && (
-                                                <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
-                                                    {msg.tool_calls.map((tc: any, i: number) => (
-                                                        <div key={i} className="font-mono text-[10px] text-text-muted bg-black/20 rounded px-2 py-1">
-                                                            🔧 {tc.function.name}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </>
+                {/* Tools Section */}
+                {history?.tools && (
+                    <div className="px-4 py-2 border-b border-border-default bg-bg-tertiary/20 flex flex-wrap gap-2">
+                        <span className="text-xs font-semibold text-text-muted flex items-center gap-1">
+                            <Wrench size={10} /> Available Tools:
+                        </span>
+                        {history.tools.map(t => (
+                            <div key={t.name} className="group relative px-2 py-0.5 rounded text-[10px] font-medium bg-accent-primary/10 text-accent-primary-light border border-accent-primary/20 cursor-help">
+                                {t.name}
+                                <div className="absolute top-full left-0 mt-1 w-48 p-2 bg-bg-secondary border border-border-default rounded shadow-lg text-text-secondary z-10 hidden group-hover:block whitespace-normal">
+                                    {t.description}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 )}
-            </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-bg-primary/30">
+                    {(!history || history.messages.length === 0) ? (
+                        <p className="text-xs text-text-muted text-center py-10">Context is empty</p>
+                    ) : (
+                        history.messages.map((msg, idx) => (
+                            <div key={idx} className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`p-1.5 rounded-full h-fit mt-1 shrink-0 
+                                            ${msg.role === 'user' ? 'bg-accent-primary/20 text-accent-primary-light'
+                                        : msg.role === 'assistant' ? 'bg-purple-500/20 text-purple-400'
+                                            : msg.role === 'system' ? 'bg-amber-500/20 text-amber-400'
+                                                : 'bg-gray-500/20 text-gray-400'}`}>
+                                    {msg.role === 'user' ? <User size={12} /> : msg.role === 'assistant' ? <Bot size={12} /> : msg.role === 'system' ? <Wrench size={12} /> : <Wrench size={12} />}
+                                </div>
+                                <div className={`max-w-[80%] rounded-lg px-3 py-2 text-xs border
+                                            ${msg.role === 'user' ? 'bg-accent-primary/10 border-accent-primary/20 text-text-primary'
+                                        : msg.role === 'assistant' ? 'bg-bg-secondary border-border-default text-text-secondary'
+                                            : 'bg-bg-tertiary border-border-default text-text-muted font-mono whitespace-pre-wrap'}`}>
+
+                                    {msg.role === 'system' ? (
+                                        <div className="font-mono text-[10px] opacity-80 max-h-32 overflow-y-auto">
+                                            {msg.content}
+                                        </div>
+                                    ) : (
+                                        <div className="prose prose-invert prose-xs max-w-none">
+                                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                {msg.content || ''}
+                                            </ReactMarkdown>
+                                        </div>
+                                    )}
+
+                                    {msg.tool_calls && (
+                                        <div className="mt-2 pt-2 border-t border-white/5 space-y-1">
+                                            {msg.tool_calls.map((tc: any, i: number) => (
+                                                <div key={i} className="font-mono text-[10px] text-text-muted bg-black/20 rounded px-2 py-1">
+                                                    🔧 {tc.function.name}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </>
+                )}
         </div>
+        </div >
     );
 }

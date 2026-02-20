@@ -185,8 +185,14 @@ export class WebServer {
                 case 'get_history':
                     if (this.whatsapp && msg.chatId) {
                         const hist = this.whatsapp.getHistoryManagers().get(msg.chatId);
+                        const tools = this.whatsapp.getAvailableTools(msg.chatId);
                         if (hist) {
-                            this.send(ws, { type: 'history', chatId: msg.chatId, messages: hist.getMessages() });
+                            this.send(ws, {
+                                type: 'history',
+                                chatId: msg.chatId,
+                                messages: hist.getMessages(),
+                                tools: tools.map(t => ({ name: t.name, description: t.description }))
+                            });
                         } else {
                             this.send(ws, { type: 'error', message: 'History not found' });
                         }

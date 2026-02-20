@@ -69,7 +69,7 @@ export function useWebSocket() {
     const [toolDetails, setToolDetails] = useState<ToolDetail[]>([]);
     const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
     const [sessions, setSessions] = useState<string[]>([]);
-    const [history, setHistory] = useState<{ chatId: string; messages: any[] } | null>(null);
+    const [history, setHistory] = useState<{ chatId: string; messages: any[]; tools?: ToolDetail[] } | null>(null);
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -248,7 +248,7 @@ export function useWebSocket() {
                     break;
 
                 case 'history':
-                    setHistory({ chatId: msg.chatId, messages: msg.messages });
+                    setHistory({ chatId: msg.chatId, messages: msg.messages, tools: msg.tools });
                     break;
 
                 case 'history_cleared':

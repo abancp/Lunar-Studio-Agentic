@@ -74,18 +74,30 @@ export function contextCommand(program: Command) {
 
     cmd.command('show <chatId>')
         .description('Show history for a specific chat ID')
-        .action(async (chatId) => {
+        .option('-f, --full', 'Show full message content')
+        .action(async (chatId, options) => {
             try {
                 await connectAndRequest({ type: 'get_history', chatId }, (msg, done) => {
                     if (msg.type === 'history') {
                         console.log(chalk.bold(`\nHistory for ${msg.chatId}:`));
                         msg.messages.forEach((m: any, idx: number) => {
                             const roleColor = m.role === 'user' ? chalk.green : m.role === 'assistant' ? chalk.blue : chalk.gray;
-                            console.log(`${chalk.dim(idx + 1 + '.')} ${roleColor(m.role.toUpperCase())}: ${m.content ? m.content.substring(0, 100).replace(/\n/g, ' ') + (m.content.length > 100 ? '...' : '') : '[No Content]'}`);
+                            let content = m.content || '[No Content]';
+                            if (!options.full && content.length > 100) {
+                                content = content.substring(0, 100).replace(/\n/g, ' ') + '...';
+                            }
+                            console.log(`${chalk.dim(idx + 1 + '.')} ${roleColor(m.role.toUpperCase())}: ${content}`);
                             if (m.tool_calls) {
                                 console.log(chalk.yellow(`  [Tool Calls: ${m.tool_calls.map((t: any) => t.function.name).join(', ')}]`));
                             }
                         });
+
+                        if (msg.tools && msg.tools.length > 0) {
+                            console.log(chalk.bold(`\nAvailable Tools:`));
+                            msg.tools.forEach((t: any) => {
+                                console.log(chalk.cyan(`- ${t.name}: `) + chalk.white(t.description));
+                            });
+                        }
                         console.log('');
                         done();
                     }

@@ -3,9 +3,11 @@ const { Client, LocalAuth, MessageMedia } = pkg;
 import qrcode from 'qrcode-terminal';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { z } from 'zod';
 import { createRequire } from 'module';
 import mammoth from 'mammoth';
+import officeParser from 'officeparser';
 
 const require = createRequire(import.meta.url);
 const pdf = require('pdf-parse');
@@ -352,6 +354,43 @@ export class WhatsAppService {
             } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
                 const result = await mammoth.extractRawText({ buffer });
                 content = result.value;
+            } else if (mimeType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation') {
+                // officeparser requires a file path or buffer.
+                try {
+                    const result = await officeParser.parseOffice(buffer);
+                    // Check for AST content and format it
+                    if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
+                        content = officeASTToMarkdown((result as any).content);
+                    } else if (result && typeof (result as any).toText === 'function') {
+                        content = (result as any).toText();
+                    } else if (typeof result === 'string') {
+                        content = result;
+                    } else if (typeof result === 'object') {
+                        logger.info(`officeparser returned object without toText: ${Object.keys(result)}`);
+                        content = JSON.stringify(result);
+                    } else {
+                        content = String(result);
+                    }
+                } catch (err: any) {
+                    logger.error(`officeparser failed on buffer: ${err.message}. Trying temp file.`);
+                    // Fallback to temp file
+                    const tempFile = path.join(os.tmpdir(), `lunar_pptx_${Date.now()}.pptx`);
+                    fs.writeFileSync(tempFile, buffer);
+                    try {
+                        const result = await officeParser.parseOffice(tempFile);
+                        if (result && typeof result === 'object' && Array.isArray((result as any).content)) {
+                            content = officeASTToMarkdown((result as any).content);
+                        } else if (result && typeof (result as any).toText === 'function') {
+                            content = (result as any).toText();
+                        } else if (typeof result === 'string') {
+                            content = result;
+                        } else {
+                            content = typeof result === 'object' ? JSON.stringify(result) : String(result);
+                        }
+                    } finally {
+                        if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+                    }
+                }
             } else if (mimeType.startsWith('text/')) {
                 content = buffer.toString('utf-8');
             } else {
@@ -377,4 +416,53 @@ export class WhatsAppService {
     public getHistoryManagers(): Map<string, HistoryManager> {
         return this.historyManagers;
     }
+
+    public getAvailableTools(chatId: string): Tool[] {
+        // We can't easily recreate the exact bound tools (like msg context) without the message object.
+        // However, we can return the schemas.
+        // For context visualization, we just need to know WHAT tools are available.
+
+        // Mock the dynamic tools for display purposes
+        const mockMsg = { getChat: async () => ({ sendMessage: async () => { } }) } as any;
+        const sendFileTool = createSendFileTool(this.client, mockMsg);
+        const readFileTool = createReadFileTool(this.fileContexts);
+
+        return [
+            ...baseTools,
+            sendFileTool,
+            readFileTool
+        ];
+    }
+}
+
+function officeASTToMarkdown(nodes: any[]): string {
+    if (!Array.isArray(nodes)) return '';
+    return nodes.map(node => {
+        let text = node.text || '';
+
+        if (node.type === 'heading') {
+            const level = Math.min(node.metadata?.level || 1, 6);
+            return `${'#'.repeat(level)} ${text}`;
+        }
+        if (node.type === 'list') {
+            return `- ${text}`;
+        }
+        if (node.type === 'table') {
+            if (node.children) {
+                // Simple table to MD
+                const rows = node.children.map((row: any) => {
+                    if (row.children) {
+                        return '| ' + row.children.map((cell: any) => (cell.text || '').replace(/[\n\r]/g, ' ')).join(' | ') + ' |';
+                    }
+                    return '';
+                }).filter((r: any) => r);
+
+                if (rows.length > 0) {
+                    return rows.join('\n');
+                }
+            }
+            return '[Table]';
+        }
+        return text;
+    }).join('\n\n');
 }

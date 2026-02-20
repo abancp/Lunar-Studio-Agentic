@@ -10,7 +10,11 @@ export class GoogleProvider implements LLMProvider {
     constructor(apiKey: string, modelName: string = 'gemini-1.5-flash') {
         this.apiKey = apiKey;
         this.genAI = new GoogleGenerativeAI(apiKey);
-        this.model = this.genAI.getGenerativeModel({ model: modelName });
+        this.model = this.genAI.getGenerativeModel({
+            model: modelName,
+        }, {
+            timeout: 180000
+        });
     }
 
     private cleanSchema(schema: any): any {
