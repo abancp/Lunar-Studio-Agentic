@@ -3,6 +3,7 @@ import { Tool } from '../llm/types.js';
 import { workspaceTools } from './workspace.js';
 import { diagramTool } from './diagram.js';
 import { animationTool } from './animation.js';
+import { presentationTool } from './presentation.js';
 import { sendWhatsAppTool } from './whatsapp_send.js';
 import { scheduleTool, listScheduledTasksTool, cancelScheduledTaskTool } from './scheduler.js';
 import { documentGeneratorTool } from './document_generator.js';
@@ -11,6 +12,7 @@ export const tools: Tool[] = [
     ...workspaceTools,
     diagramTool,
     animationTool,
+    presentationTool,
     sendWhatsAppTool,
     scheduleTool,
     listScheduledTasksTool,
