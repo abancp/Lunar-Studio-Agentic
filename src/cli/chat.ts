@@ -2,7 +2,9 @@ import inquirer from 'inquirer';
 import chalk from 'chalk';
 import * as config from './config.js';
 import { createLLM } from '../../llm/factory.js';
-import { tools, getTool } from '../../tools/index.js';
+import { ToolRegistry } from '../core/ToolRegistry.js';
+import { PowerManager } from '../core/PowerManager.js';
+import { ToolContext } from '../../llm/types.js';
 import { HistoryManager } from './history.js';
 import { AGENTIC_SYSTEM_PROMPT, buildSystemPrompt } from '../../llm/system.js';
 import { MemoryManager } from '../memory.js';
@@ -84,6 +86,10 @@ export async function chatCommand() {
         const llm = createLLM(providerName as string, (apiKey || '') as string, (model || '') as string);
         const memoryManager = new MemoryManager();
 
+        const registry = new ToolRegistry();
+        const powerManager = new PowerManager(registry);
+        await powerManager.loadPowers();
+
         // Build system prompt with memory context (owner = CLI user)
         const memoryContext = memoryManager.getContextString(OWNER_PERSON_ID);
         const systemPrompt = buildSystemPrompt(memoryContext);
@@ -118,7 +124,7 @@ export async function chatCommand() {
                 keepGenerating = false;
 
                 try {
-                    const response = await llm.generate(history.getMessages(), tools);
+                    const response = await llm.generate(history.getMessages(), registry.getAllTools());
 
                     let content = response.content || '';
 
@@ -147,18 +153,23 @@ export async function chatCommand() {
 
                             console.log(chalk.dim(`Executing ${toolName} with args: ${argsStr}`));
 
-                            const tool = getTool(toolName);
                             let result = "Tool not found.";
-                            if (tool) {
-                                try {
-                                    const executionResult = await tool.execute(args);
-                                    result = typeof executionResult === 'string' ? executionResult : JSON.stringify(executionResult);
-                                } catch (err: any) {
+                            try {
+                                const context: ToolContext = {
+                                    registry,
+                                    reply: async (messageText: string) => {
+                                        console.log(chalk.cyan(`\n[${toolName}]: `) + chalk.white(messageText));
+                                    }
+                                };
+                                const executionResult = await registry.executeTool(toolName, args, context);
+                                result = typeof executionResult === 'string' ? executionResult : JSON.stringify(executionResult);
+                            } catch (err: any) {
+                                if (err.message.includes('not found')) {
+                                    console.log(chalk.red(`Tool ${toolName} not found.`));
+                                } else {
                                     result = `Error executing tool: ${err.message}`;
                                     console.error(chalk.red(result));
                                 }
-                            } else {
-                                console.log(chalk.red(`Tool ${toolName} not found.`));
                             }
 
                             console.log(chalk.dim(`Result: ${result.substring(0, 100)}...`));

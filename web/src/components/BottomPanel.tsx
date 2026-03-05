@@ -38,11 +38,11 @@ export default function BottomPanel({ onSend, onStop, isGenerating, isConnected,
     const toolCount = agentStatus?.tools?.length || 0;
 
     return (
-        <div className="glass-panel-solid rounded-xl px-6 py-5 shrink-0">
+        <div className="glass-panel-solid rounded-xl px-3 py-3 md:px-6 md:py-5 shrink-0">
             {/* Input Row */}
-            <div className="flex items-end gap-4">
-                {/* Attachment */}
-                <button className="p-3 rounded-xl text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors cursor-pointer shrink-0 mb-0.5">
+            <div className="flex items-end gap-2 md:gap-4">
+                {/* Attachment — hidden on mobile */}
+                <button className="hidden sm:block p-3 rounded-xl text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors cursor-pointer shrink-0 mb-0.5">
                     <Paperclip size={18} />
                 </button>
 
@@ -56,35 +56,35 @@ export default function BottomPanel({ onSend, onStop, isGenerating, isConnected,
                             placeholder={isConnected ? 'Message Lunar Studio...' : 'Connecting to agent...'}
                             disabled={!isConnected}
                             rows={1}
-                            className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none resize-none px-5 py-4 max-h-32 min-h-[52px] font-sans leading-relaxed disabled:opacity-50"
+                            className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-muted outline-none resize-none px-4 py-3.5 md:px-5 md:py-4 max-h-32 min-h-[48px] md:min-h-[52px] font-sans leading-relaxed disabled:opacity-50"
                             style={{
-                                height: input ? 'auto' : '52px',
+                                height: input ? 'auto' : undefined,
                             }}
                         />
 
                         {/* Inline Actions */}
-                        <div className="flex items-center gap-1.5 pr-3 pb-3">
-                            <button className="p-2 rounded-lg text-text-muted hover:text-text-secondary hover:bg-bg-hover/60 transition-colors cursor-pointer">
+                        <div className="flex items-center gap-1.5 pr-2.5 pb-2.5 md:pr-3 md:pb-3">
+                            <button className="hidden sm:block p-2 rounded-lg text-text-muted hover:text-text-secondary hover:bg-bg-hover/60 transition-colors cursor-pointer">
                                 <Mic size={16} />
                             </button>
 
                             {isGenerating ? (
                                 <button
                                     onClick={onStop}
-                                    className="p-2.5 rounded-xl bg-danger/15 text-danger hover:bg-danger/25 transition-colors cursor-pointer"
+                                    className="p-2 md:p-2.5 rounded-xl bg-danger/15 text-danger hover:bg-danger/25 transition-colors cursor-pointer"
                                 >
-                                    <StopCircle size={18} />
+                                    <StopCircle size={17} />
                                 </button>
                             ) : (
                                 <button
                                     onClick={handleSend}
                                     disabled={!input.trim() || !isConnected}
-                                    className={`p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${input.trim() && isConnected
-                                            ? 'bg-accent-primary text-white shadow-lg shadow-accent-primary/20 hover:bg-accent-primary/90 scale-100'
-                                            : 'bg-bg-hover text-text-muted scale-95'
+                                    className={`p-2 md:p-2.5 rounded-xl transition-all duration-200 cursor-pointer ${input.trim() && isConnected
+                                        ? 'bg-accent-primary text-white shadow-lg shadow-accent-primary/20 hover:bg-accent-primary/90 scale-100'
+                                        : 'bg-bg-hover text-text-muted scale-95'
                                         }`}
                                 >
-                                    <Send size={16} />
+                                    <Send size={15} />
                                 </button>
                             )}
                         </div>
@@ -93,7 +93,7 @@ export default function BottomPanel({ onSend, onStop, isGenerating, isConnected,
             </div>
 
             {/* Bottom Bar */}
-            <div className="flex items-center justify-between mt-4 px-2">
+            <div className="flex items-center justify-between mt-3 md:mt-4 px-1 md:px-2">
                 {/* Left — Status */}
                 <div className="flex items-center gap-3">
                     {isGenerating ? (
@@ -104,25 +104,25 @@ export default function BottomPanel({ onSend, onStop, isGenerating, isConnected,
                                 <div className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce" style={{ animationDelay: '300ms' }} />
                             </div>
                             <span className="text-xs text-accent-primary-light font-medium">
-                                Generating response...
+                                Generating...
                             </span>
                         </div>
                     ) : (
                         <div className="flex items-center gap-2">
                             <Sparkles size={12} className="text-text-muted" />
-                            <span className="text-xs text-text-muted">
+                            <span className="text-xs text-text-muted truncate max-w-[120px] md:max-w-none">
                                 {model}
                             </span>
-                            <span className="text-xs text-text-muted">·</span>
-                            <span className="text-xs text-text-muted">
-                                {toolCount} tools active
+                            <span className="hidden sm:inline text-xs text-text-muted">·</span>
+                            <span className="hidden sm:inline text-xs text-text-muted">
+                                {toolCount} tools
                             </span>
                         </div>
                     )}
                 </div>
 
-                {/* Right — Shortcuts */}
-                <div className="flex items-center gap-4 text-text-muted">
+                {/* Right — Shortcuts (hidden on mobile) */}
+                <div className="hidden md:flex items-center gap-4 text-text-muted">
                     <div className="flex items-center gap-1.5">
                         <kbd className="text-[10px] px-1.5 py-1 rounded border border-border-default bg-bg-tertiary/40 font-mono">
                             <CornerDownLeft size={9} className="inline" />

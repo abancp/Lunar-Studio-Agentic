@@ -52,7 +52,7 @@ function CodeBlock({ className, children }: { className?: string; children?: Rea
                 </button>
             </div>
             {/* Code content */}
-            <pre className="p-4 overflow-x-auto text-[13px] leading-relaxed">
+            <pre className="p-3 md:p-4 overflow-x-auto text-[12px] md:text-[13px] leading-relaxed">
                 <code className={className}>{children}</code>
             </pre>
         </div>
@@ -69,9 +69,9 @@ function ToolCallRow({ tool, isLast }: { tool: ToolCallInfo; isLast: boolean }) 
         <>
             <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-bg-hover/50 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 hover:bg-bg-hover/50 transition-colors cursor-pointer"
             >
-                <div className={`w-5 h-5 rounded-md flex items-center justify-center ${isRunning ? 'bg-accent-secondary/15' : 'bg-success/15'
+                <div className={`w-5 h-5 rounded-md flex items-center justify-center shrink-0 ${isRunning ? 'bg-accent-secondary/15' : 'bg-success/15'
                     }`}>
                     {isRunning ? (
                         <Loader2 size={11} className="text-accent-secondary animate-spin" />
@@ -79,11 +79,11 @@ function ToolCallRow({ tool, isLast }: { tool: ToolCallInfo; isLast: boolean }) 
                         <CheckCircle size={11} className="text-success" />
                     )}
                 </div>
-                <span className="text-xs font-medium text-accent-primary-light">
+                <span className="text-xs font-medium text-accent-primary-light shrink-0">
                     {tool.name}
                 </span>
                 {tool.args && (
-                    <span className="text-[10px] text-text-muted font-mono ml-0.5 truncate flex-1 text-left">
+                    <span className="text-[10px] text-text-muted font-mono ml-0.5 truncate flex-1 text-left hidden sm:block">
                         {tool.args}
                     </span>
                 )}
@@ -97,7 +97,7 @@ function ToolCallRow({ tool, isLast }: { tool: ToolCallInfo; isLast: boolean }) 
                 </div>
             </button>
             {expanded && tool.result && (
-                <div className="px-4 pb-2.5">
+                <div className="px-3 md:px-4 pb-2.5">
                     <pre className="text-[11px] font-mono text-text-secondary p-3 rounded-lg bg-bg-primary/60 overflow-x-auto whitespace-pre-wrap max-h-40 overflow-y-auto">
                         {tool.result}
                     </pre>
@@ -116,8 +116,8 @@ function ToolCallStack({ tools }: { tools: ToolCallInfo[] }) {
 
     return (
         <div className="my-3 rounded-xl border border-border-default bg-bg-tertiary/40 overflow-hidden animate-fade-in">
-            <div className="flex items-center gap-2.5 px-4 py-2 bg-bg-tertiary/60 border-b border-border-default/60">
-                <div className="w-5 h-5 rounded-md bg-accent-primary/15 flex items-center justify-center">
+            <div className="flex items-center gap-2.5 px-3 md:px-4 py-2 bg-bg-tertiary/60 border-b border-border-default/60">
+                <div className="w-5 h-5 rounded-md bg-accent-primary/15 flex items-center justify-center shrink-0">
                     {tools.length > 1 ? (
                         <Layers size={11} className="text-accent-primary-light" />
                     ) : (
@@ -218,29 +218,29 @@ function MessageBubble({ message }: { message: ChatMessage }) {
 
     return (
         <div
-            className={`flex gap-4 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}`}
+            className={`flex gap-2 md:gap-4 animate-fade-in ${isUser ? 'flex-row-reverse' : ''}`}
         >
             {/* Avatar */}
             <div
-                className={`w-9 h-9 rounded-full shrink-0 flex items-center justify-center mt-1 ${isUser
+                className={`w-8 h-8 md:w-9 md:h-9 rounded-full shrink-0 flex items-center justify-center mt-1 ${isUser
                     ? 'bg-accent-primary/15 border border-accent-primary/20'
                     : 'bg-accent-secondary/10 border border-accent-secondary/15'
                     }`}
             >
                 {isUser ? (
-                    <User size={15} className="text-accent-primary-light" />
+                    <User size={14} className="text-accent-primary-light" />
                 ) : (
-                    <Bot size={15} className="text-accent-secondary" />
+                    <Bot size={14} className="text-accent-secondary" />
                 )}
             </div>
 
             {/* Content */}
-            <div className={`flex flex-col max-w-[75%] ${isUser ? 'items-end' : ''}`}>
+            <div className={`flex flex-col max-w-[85%] sm:max-w-[80%] lg:max-w-[75%] ${isUser ? 'items-end' : ''}`}>
                 {message.content && (
                     <div
                         className={`rounded-2xl text-sm overflow-hidden ${isUser
-                            ? 'bg-accent-primary/12 border border-accent-primary/15 text-text-primary rounded-tr-sm px-5 py-3.5'
-                            : 'bg-bg-tertiary/60 border border-border-default text-text-primary rounded-tl-sm px-5 py-4'
+                            ? 'bg-accent-primary/12 border border-accent-primary/15 text-text-primary rounded-tr-sm px-4 py-3 md:px-5 md:py-3.5'
+                            : 'bg-bg-tertiary/60 border border-border-default text-text-primary rounded-tl-sm px-4 py-3 md:px-5 md:py-4'
                             }`}
                     >
                         {isUser ? (
@@ -320,21 +320,21 @@ export default function MainPanel({ messages, isGenerating, agentStatus }: MainP
     return (
         <main className="flex-1 flex flex-col min-h-0 min-w-0 relative glass-panel-solid rounded-xl overflow-hidden">
             {/* Chat Header */}
-            <div className="px-6 py-4 border-b border-border-default flex items-center justify-between bg-bg-secondary/50 shrink-0">
-                <div className="flex items-center gap-3">
-                    <div className="w-7 h-7 rounded-lg bg-accent-primary/10 flex items-center justify-center">
-                        <Sparkles size={14} className="text-accent-primary-light" />
+            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-border-default flex items-center justify-between bg-bg-secondary/50 shrink-0">
+                <div className="flex items-center gap-2 md:gap-3">
+                    <div className="w-6 h-6 md:w-7 md:h-7 rounded-lg bg-accent-primary/10 flex items-center justify-center shrink-0">
+                        <Sparkles size={12} className="text-accent-primary-light" />
                     </div>
                     <div>
-                        <h2 className="text-sm font-semibold text-text-primary">New Conversation</h2>
-                        <p className="text-[10px] text-text-muted">
+                        <h2 className="text-xs md:text-sm font-semibold text-text-primary">New Conversation</h2>
+                        <p className="text-[10px] text-text-muted hidden sm:block">
                             Model: {model} · Tools: {toolCount} active
                         </p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-text-muted font-mono px-2.5 py-1.5 rounded-lg bg-bg-tertiary/50 border border-border-default">
-                        {messages.length} messages
+                    <span className="text-[10px] text-text-muted font-mono px-2 py-1.5 md:px-2.5 rounded-lg bg-bg-tertiary/50 border border-border-default">
+                        {messages.length} msg
                     </span>
                 </div>
             </div>
@@ -342,18 +342,18 @@ export default function MainPanel({ messages, isGenerating, agentStatus }: MainP
             {/* Messages Area */}
             <div
                 ref={scrollRef}
-                className="flex-1 overflow-y-auto px-10 py-8 space-y-7 scroll-smooth"
+                className="flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6 lg:px-10 lg:py-8 space-y-5 md:space-y-7 scroll-smooth overscroll-contain"
             >
                 {/* Welcome (show only when no messages) */}
                 {messages.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-10 animate-fade-in">
-                        <div className="rounded-2xl bg-linear-to-br from-accent-primary/20 to-accent-secondary/20 border border-border-default flex items-center justify-center mb-5 glow-accent" style={{ width: '72px', height: '72px' }}>
-                            <Bot size={30} className="text-accent-primary-light" />
+                        <div className="rounded-2xl bg-linear-to-br from-accent-primary/20 to-accent-secondary/20 border border-border-default flex items-center justify-center mb-5 glow-accent" style={{ width: '64px', height: '64px' }}>
+                            <Bot size={28} className="text-accent-primary-light" />
                         </div>
-                        <h3 className="text-lg font-semibold text-gradient mb-2">
+                        <h3 className="text-base md:text-lg font-semibold text-gradient mb-2">
                             Lunar Studio Agent
                         </h3>
-                        <p className="text-sm text-text-muted text-center max-w-md">
+                        <p className="text-sm text-text-muted text-center max-w-xs md:max-w-md px-4">
                             Your AI assistant with tools for calculation, weather, workspace
                             management, and more. Start typing to begin.
                         </p>
@@ -369,11 +369,11 @@ export default function MainPanel({ messages, isGenerating, agentStatus }: MainP
 
                 {/* Generating Indicator */}
                 {isGenerating && (
-                    <div className="flex gap-4 animate-fade-in">
-                        <div className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center mt-1 bg-accent-secondary/10 border border-accent-secondary/15">
-                            <Bot size={15} className="text-accent-secondary" />
+                    <div className="flex gap-2 md:gap-4 animate-fade-in">
+                        <div className="w-8 h-8 md:w-9 md:h-9 rounded-full shrink-0 flex items-center justify-center mt-1 bg-accent-secondary/10 border border-accent-secondary/15">
+                            <Bot size={14} className="text-accent-secondary" />
                         </div>
-                        <div className="px-5 py-3.5 rounded-2xl bg-bg-tertiary/60 border border-border-default rounded-tl-sm">
+                        <div className="px-4 py-3 md:px-5 md:py-3.5 rounded-2xl bg-bg-tertiary/60 border border-border-default rounded-tl-sm">
                             <div className="flex items-center gap-1.5">
                                 <div className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce" style={{ animationDelay: '0ms' }} />
                                 <div className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-bounce" style={{ animationDelay: '150ms' }} />

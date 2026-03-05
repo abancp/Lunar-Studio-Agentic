@@ -1,10 +1,15 @@
 import { z } from 'zod';
 
+export interface ToolContext {
+    registry: any; // We use 'any' here or import ToolRegistry to avoid circular deps. 'any' is safer if ToolRegistry imports Tool.
+    reply?: (message: string) => Promise<void>;
+}
+
 export interface Tool {
     name: string;
     description: string;
-    schema: z.ZodType<any>;
-    execute: (args: any) => Promise<any>;
+    schema: z.ZodType<any, any>;
+    execute: (args: any, context?: ToolContext) => Promise<any>;
 }
 
 export type MessageRole = 'system' | 'user' | 'assistant' | 'tool';

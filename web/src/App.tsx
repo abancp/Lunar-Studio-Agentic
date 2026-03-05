@@ -14,23 +14,41 @@ export default function App() {
   const ws = useWebSocket();
   const [activePage, setActivePage] = useState<NavPage>('chat');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const handleNavigate = (page: NavPage) => {
+    setActivePage(page);
+    setSidebarOpen(false); // close drawer on mobile after navigation
+  };
 
   return (
-    <div className="h-screen w-screen bg-bg-primary p-2 flex flex-col gap-2 overflow-hidden">
+    <div className="h-screen w-screen bg-bg-primary flex flex-col gap-2 p-2 overflow-hidden">
       {/* Top Panel */}
       <TopPanel
         isConnected={ws.isConnected}
         agentStatus={ws.agentStatus}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSidebar={() => setSidebarOpen(true)}
       />
 
       {/* Body: Side + Main/Bottom */}
-      <div className="flex flex-1 min-h-0 gap-2">
+      <div className="flex flex-1 min-h-0 gap-2 relative">
+
+        {/* Mobile backdrop overlay */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Side Panel */}
         <SidePanel
           agentStatus={ws.agentStatus}
           activePage={activePage}
-          onNavigate={setActivePage}
+          onNavigate={handleNavigate}
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
 
         {/* Main Content Area */}

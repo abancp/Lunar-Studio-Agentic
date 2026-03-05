@@ -22,6 +22,7 @@ interface ConfigSchema {
     };
     people?: Person[];
     jobs?: ScheduledJob[];
+    powersDir?: string;
 }
 
 export interface ScheduledJob {
@@ -83,6 +84,14 @@ export const getWorkspace = (): string => {
 
 export const setWorkspace = (path: string): void => {
     config.set('workspace', path);
+};
+
+export const getPowersDir = (): string => {
+    return config.get('powersDir') || (process.env.HOME ? `${process.env.HOME}/.lunarstudio/powers` : './powers');
+};
+
+export const setPowersDir = (path: string): void => {
+    config.set('powersDir', path);
 };
 
 export const getWhatsAppConfig = () => {

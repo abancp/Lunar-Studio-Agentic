@@ -6,6 +6,7 @@ import { listModelsCommand } from './list-models.js';
 import { memoriesCommand } from './memories.js';
 import { schedulerCommand } from './scheduler.js';
 import { contextCommand } from './context.js';
+import { powersCommand } from './powers.js';
 
 const program = new Command();
 
@@ -37,6 +38,7 @@ program
 
 schedulerCommand(program);
 contextCommand(program);
+powersCommand(program);
 
 program
     .command('daemon')

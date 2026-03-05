@@ -16,7 +16,8 @@ import * as config from '../src/cli/config.js';
 import { createLLM } from '../llm/factory.js';
 import { HistoryManager } from '../src/cli/history.js';
 import { AGENTIC_SYSTEM_PROMPT, buildSystemPrompt } from '../llm/system.js';
-import { tools as baseTools } from '../tools/index.js';
+import { ToolRegistry } from '../src/core/ToolRegistry.js';
+import { PowerManager } from '../src/core/PowerManager.js';
 import { Tool } from '../llm/types.js';
 import { MemoryManager } from '../src/memory.js';
 
@@ -93,12 +94,16 @@ export class WhatsAppService {
     private hotword?: string;
     private aiEnabledNumbers: Record<string, boolean> = {};
     private memoryManager: MemoryManager;
+    private registry: ToolRegistry;
+    private powerManager: PowerManager;
     // Map<FileID, Content>
     private fileContexts: Map<string, string> = new Map();
 
     constructor() {
         this.startTime = Math.floor(Date.now() / 1000);
         this.memoryManager = new MemoryManager();
+        this.registry = new ToolRegistry();
+        this.powerManager = new PowerManager(this.registry);
         const conf = config.getWhatsAppConfig();
         this.enabled = conf?.enabled || false;
         this.hotword = conf?.hotword;
@@ -152,6 +157,7 @@ export class WhatsAppService {
         }
         logger.info("Initializing WhatsApp Client...");
         try {
+            await this.powerManager.loadPowers();
             await this.client.initialize();
         } catch (error: any) {
             logger.error(`Failed to initialize WhatsApp client: ${error.message}`);
@@ -161,6 +167,7 @@ export class WhatsAppService {
     async setup() {
         logger.info("Starting WhatsApp Setup (QR generation)...");
         this.enabled = true;
+        await this.powerManager.loadPowers();
         await this.client.initialize();
     }
 
@@ -281,7 +288,7 @@ export class WhatsAppService {
 
             // Inject WhatsApp-specific tools (send_file bound to this message)
             const waTools: Tool[] = [
-                ...baseTools,
+                ...this.registry.getAllTools(),
                 createSendFileTool(this.client, msg),
                 createReadFileTool(this.fileContexts), // Inject read tool
             ];
@@ -321,8 +328,15 @@ export class WhatsAppService {
                             try {
                                 const args = JSON.parse(call.function.arguments);
                                 logger.info(`Executing tool ${tool.name} with args: ${JSON.stringify(args)}`);
-                                const result = await tool.execute(args);
+                                const context = {
+                                    registry: this.registry,
+                                    reply: async (messageText: string) => {
+                                        await msg.reply(messageText);
+                                    }
+                                };
+                                const result = await tool.execute(args, context);
                                 resultString = typeof result === 'string' ? result : JSON.stringify(result);
+                                logger.info(`Tool ${tool.name} returned: ${resultString.substring(0, 1000)}...`);
                             } catch (error: any) {
                                 logger.error(`Tool execution error: ${error.message}`);
                                 resultString = `Error executing tool: ${error.message}`;
@@ -446,7 +460,7 @@ export class WhatsAppService {
         const readFileTool = createReadFileTool(this.fileContexts);
 
         return [
-            ...baseTools,
+            ...this.registry.getAllTools(),
             sendFileTool,
             readFileTool
         ];
