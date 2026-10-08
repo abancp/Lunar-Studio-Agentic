@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import type { FileMessage } from '../components/MediaMessage';
 
 // ── Types ──
 
@@ -10,6 +11,7 @@ export interface ChatMessage {
     content: string;
     timestamp: string;
     toolCalls?: ToolCallInfo[];
+    fileAttachment?: FileMessage;
 }
 
 export interface ToolCallInfo {
@@ -70,6 +72,9 @@ export function useWebSocket() {
     const [agentConfig, setAgentConfig] = useState<AgentConfig | null>(null);
     const [sessions, setSessions] = useState<string[]>([]);
     const [history, setHistory] = useState<{ chatId: string; messages: any[]; tools?: ToolDetail[] } | null>(null);
+    const [receivedFiles, setReceivedFiles] = useState<FileMessage[]>([]);
+    const [notifications, setNotifications] = useState<{ id: string; title: string; body: string; notifyType: string }[]>([]);
+
 
     const wsRef = useRef<WebSocket | null>(null);
     const reconnectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -214,6 +219,52 @@ export function useWebSocket() {
                     }]);
                     break;
 
+                case 'file': {
+                    const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const fileMsg: FileMessage = {
+                        id: `file-${Date.now()}`,
+                        fileName: msg.fileName,
+                        mimeType: msg.mimeType,
+                        data: msg.data,
+                        caption: msg.caption,
+                        forceDownload: msg.forceDownload,
+                        sizeBytes: msg.sizeBytes,
+                        timestamp: now,
+                    };
+                    setReceivedFiles(prev => [...prev, fileMsg]);
+                    setMessages(prev => [...prev, {
+                        id: fileMsg.id,
+                        role: 'assistant' as const,
+                        content: '',
+                        timestamp: now,
+                        fileAttachment: fileMsg,
+                    }]);
+                    break;
+                }
+
+                case 'notify': {
+                    const notifId = `notif-${Date.now()}`;
+                    setNotifications(prev => [...prev, {
+                        id: notifId,
+                        title: msg.title,
+                        body: msg.body,
+                        notifyType: msg.notifyType || 'info',
+                    }]);
+                    setTimeout(() => {
+                        setNotifications(prev => prev.filter(n => n.id !== notifId));
+                    }, 5000);
+                    break;
+                }
+
+                case 'upload_ok':
+                    setMessages(prev => [...prev, {
+                        id: `upload-${Date.now()}`,
+                        role: 'assistant' as const,
+                        content: `📎 **${msg.fileName}** uploaded (id: \`${msg.fileId}\`). You can now ask me about this file.`,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    }]);
+                    break;
+
                 case 'welcome':
                     break;
 
@@ -298,6 +349,32 @@ export function useWebSocket() {
         setIsGenerating(false);
     }, []);
 
+    const uploadFile = useCallback((file: File): Promise<void> => {
+        return new Promise((resolve, reject) => {
+            if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+                reject(new Error('Not connected'));
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => {
+                const base64 = (reader.result as string).split(',')[1];
+                wsRef.current!.send(JSON.stringify({
+                    type: 'upload_file',
+                    fileName: file.name,
+                    mimeType: file.type || 'application/octet-stream',
+                    data: base64,
+                }));
+                resolve();
+            };
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+        });
+    }, []);
+
+    const dismissNotification = useCallback((id: string) => {
+        setNotifications(prev => prev.filter(n => n.id !== id));
+    }, []);
+
     const requestLogs = useCallback(() => {
         if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
         wsRef.current.send(JSON.stringify({ type: 'get_logs' }));
@@ -354,6 +431,10 @@ export function useWebSocket() {
         agentConfig,
         sendMessage,
         stopGenerating,
+        uploadFile,
+        receivedFiles,
+        notifications,
+        dismissNotification,
         requestLogs,
         requestMemories,
         requestTools,

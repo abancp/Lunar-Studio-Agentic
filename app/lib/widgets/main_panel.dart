@@ -3,6 +3,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/models.dart';
 import '../theme/app_theme.dart';
 import 'shared_widgets.dart';
+import 'file_message_bubble.dart';
 
 class MainPanelWidget extends StatefulWidget {
   final List<ChatMessage> messages;
@@ -41,7 +42,7 @@ class _MainPanelWidgetState extends State<MainPanelWidget> {
   void _onScroll() {
     final atBottom =
         _scrollController.position.maxScrollExtent - _scrollController.offset <
-        100;
+            100;
     if (atBottom != !_showScrollBtn) {
       setState(() => _showScrollBtn = !atBottom);
     }
@@ -158,8 +159,7 @@ class _MainPanelWidgetState extends State<MainPanelWidget> {
                           horizontal: isWide ? 40 : 12,
                           vertical: isWide ? 32 : 16,
                         ),
-                        itemCount:
-                            widget.messages.length +
+                        itemCount: widget.messages.length +
                             (widget.isGenerating ? 1 : 0),
                         itemBuilder: (context, i) {
                           if (i == widget.messages.length) {
@@ -288,23 +288,21 @@ class _MessageBubble extends StatelessWidget {
     final maxWidth = w < 600
         ? w * 0.85
         : w < 900
-        ? w * 0.75
-        : w * 0.6;
+            ? w * 0.75
+            : w * 0.6;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisAlignment: isUser
-          ? MainAxisAlignment.end
-          : MainAxisAlignment.start,
+      mainAxisAlignment:
+          isUser ? MainAxisAlignment.end : MainAxisAlignment.start,
       children: [
         if (!isUser) ...[_Avatar(isUser: false), const SizedBox(width: 10)],
         Flexible(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxWidth),
             child: Column(
-              crossAxisAlignment: isUser
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
                 if (message.content.isNotEmpty)
                   Container(
@@ -338,6 +336,13 @@ class _MessageBubble extends StatelessWidget {
                             ),
                           )
                         : _MarkdownBody(content: message.content),
+                  ),
+
+                // File attachment (image, video, document, etc.)
+                if (message.fileAttachment != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: FileMessageBubble(file: message.fileAttachment!),
                   ),
 
                 // Tool calls
@@ -485,9 +490,8 @@ class _ToolCallStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final runningCount = tools
-        .where((t) => t.status == ToolStatus.running)
-        .length;
+    final runningCount =
+        tools.where((t) => t.status == ToolStatus.running).length;
     final doneCount = tools.where((t) => t.status == ToolStatus.done).length;
 
     return Container(
@@ -580,8 +584,9 @@ class _ToolCallStack extends StatelessWidget {
           ),
           // Tool rows
           ...tools.asMap().entries.map(
-            (e) => _ToolRow(tool: e.value, isLast: e.key == tools.length - 1),
-          ),
+                (e) =>
+                    _ToolRow(tool: e.value, isLast: e.key == tools.length - 1),
+              ),
         ],
       ),
     );
@@ -667,9 +672,8 @@ class _ToolRowState extends State<_ToolRow> {
                 Text(
                   isRunning ? 'Running' : 'Done',
                   style: TextStyle(
-                    color: isRunning
-                        ? AppTheme.accentSecondary
-                        : AppTheme.success,
+                    color:
+                        isRunning ? AppTheme.accentSecondary : AppTheme.success,
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
                   ),

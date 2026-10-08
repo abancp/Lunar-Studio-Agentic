@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
     Send,
     Paperclip,
@@ -13,13 +13,15 @@ import type { AgentStatus } from '../hooks/useWebSocket';
 interface BottomPanelProps {
     onSend: (message: string) => void;
     onStop: () => void;
+    onUpload?: (file: File) => Promise<void>;
     isGenerating: boolean;
     isConnected: boolean;
     agentStatus: AgentStatus | null;
 }
 
-export default function BottomPanel({ onSend, onStop, isGenerating, isConnected, agentStatus }: BottomPanelProps) {
+export default function BottomPanel({ onSend, onStop, onUpload, isGenerating, isConnected, agentStatus }: BottomPanelProps) {
     const [input, setInput] = useState('');
+    const fileRef = useRef<HTMLInputElement>(null);
 
     const handleSend = () => {
         if (!input.trim() || !isConnected) return;
@@ -42,9 +44,25 @@ export default function BottomPanel({ onSend, onStop, isGenerating, isConnected,
             {/* Input Row */}
             <div className="flex items-end gap-2 md:gap-4">
                 {/* Attachment — hidden on mobile */}
-                <button className="hidden sm:block p-3 rounded-xl text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors cursor-pointer shrink-0 mb-0.5">
-                    <Paperclip size={18} />
-                </button>
+                <>
+                    <input
+                        ref={fileRef}
+                        type="file"
+                        className="hidden"
+                        onChange={e => {
+                            const file = e.target.files?.[0];
+                            if (file && onUpload) onUpload(file);
+                            e.target.value = '';
+                        }}
+                    />
+                    <button
+                        className="hidden sm:block p-3 rounded-xl text-text-muted hover:text-text-secondary hover:bg-bg-hover transition-colors cursor-pointer shrink-0 mb-0.5"
+                        onClick={() => fileRef.current?.click()}
+                        title="Upload file to agent"
+                    >
+                        <Paperclip size={18} />
+                    </button>
+                </>
 
                 {/* Input Container */}
                 <div className="flex-1 relative">

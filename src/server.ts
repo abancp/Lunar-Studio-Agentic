@@ -1,11 +1,13 @@
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { WebSocketServer, WebSocket } from 'ws';
 import { logger, getLogPath } from './log.js';
 import * as config from './cli/config.js';
 import { createLLM } from '../llm/factory.js';
 import { WhatsAppService } from '../external-apps/whatsapp.js';
+import { createLunarStudioTools } from '../external-apps/lunar_studio.js';
 import { tools, getTool } from '../tools/index.js';
 import { HistoryManager } from './cli/history.js';
 import { buildSystemPrompt } from '../llm/system.js';
@@ -17,17 +19,37 @@ import { zodToJsonSchema } from 'zod-to-json-schema';
 
 interface ClientMessage {
     type: 'chat' | 'stop' | 'get_status' | 'get_logs' | 'get_memories' | 'get_tools' | 'get_config' | 'update_config'
-    | 'get_sessions' | 'get_history' | 'clear_history' | 'pop_history';
+    | 'get_sessions' | 'get_history' | 'clear_history' | 'pop_history' | 'upload_file';
     message?: string;
     config?: { key: string; value: any };
     chatId?: string;
+    // upload_file fields
+    fileName?: string;
+    mimeType?: string;
+    data?: string; // base64
 }
 
 interface ServerMessage {
     type: 'text' | 'tool_start' | 'tool_result' | 'done' | 'error' | 'status' | 'welcome'
     | 'logs' | 'log_line' | 'memories' | 'tools_list' | 'config' | 'config_updated'
-    | 'sessions' | 'history' | 'history_cleared' | 'history_popped';
+    | 'sessions' | 'history' | 'history_cleared' | 'history_popped'
+    | 'file' | 'notify' | 'upload_ok';
     [key: string]: any;
+}
+
+// ── Temp upload store ──
+// Maps fileId → { path, name, mimeType } per server lifetime
+const uploadedFiles = new Map<string, { path: string; name: string; mimeType: string }>();
+
+function saveUploadedFile(fileName: string, mimeType: string, base64Data: string): string {
+    const fileId = `upload_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const ext = path.extname(fileName) || '';
+    const tmpPath = path.join(os.tmpdir(), `${fileId}${ext}`);
+    const buffer = Buffer.from(base64Data, 'base64');
+    fs.writeFileSync(tmpPath, buffer);
+    uploadedFiles.set(fileId, { path: tmpPath, name: fileName, mimeType });
+    logger.info(`File uploaded from app: ${fileName} → ${tmpPath} (id: ${fileId})`);
+    return fileId;
 }
 
 // ── MIME Types ──
@@ -82,6 +104,27 @@ export class WebServer {
     private handleHTTP(req: http.IncomingMessage, res: http.ServerResponse) {
         let urlPath = req.url || '/';
         urlPath = urlPath.split('?')[0]!;
+
+        // ── Serve uploaded files ──
+        // GET /uploads/:fileId
+        const uploadMatch = urlPath.match(/^\/uploads\/([^/]+)$/);
+        if (uploadMatch) {
+            const fileId = uploadMatch[1]!;
+            const entry = uploadedFiles.get(fileId);
+            if (!entry || !fs.existsSync(entry.path)) {
+                res.writeHead(404);
+                res.end('File not found');
+                return;
+            }
+            res.writeHead(200, {
+                'Content-Type': entry.mimeType,
+                'Content-Disposition': `attachment; filename="${encodeURIComponent(entry.name)}"`,
+                'Access-Control-Allow-Origin': '*',
+            });
+            fs.createReadStream(entry.path).pipe(res);
+            return;
+        }
+
         if (urlPath === '/') urlPath = '/index.html';
 
         const filePath = path.join(this.staticDir, urlPath);
@@ -119,6 +162,10 @@ export class WebServer {
         let isGenerating = false;
         let shouldStop = false;
         let logWatcher: fs.FSWatcher | null = null;
+        // Per-connection file store (uploads from this client session)
+        const connFileStore = new Map<string, { path: string; name: string; mimeType: string }>();
+        // Build per-connection Lunar Studio tools
+        const lunarStudioTools = createLunarStudioTools(ws, connFileStore);
 
         // Initialize system prompt with memory
         const memoryContext = this.memoryManager.getContextString('owner');
@@ -210,6 +257,26 @@ export class WebServer {
                     }
                     break;
 
+                case 'upload_file': {
+                    // Client uploads a file (base64) → we save it and give it a fileId
+                    if (!msg.fileName || !msg.data) {
+                        this.send(ws, { type: 'error', message: 'upload_file requires fileName and data' });
+                        break;
+                    }
+                    const mimeType = msg.mimeType || 'application/octet-stream';
+                    const fileId = saveUploadedFile(msg.fileName, mimeType, msg.data);
+                    // Also add to this connection's store so read_app_file can access it
+                    connFileStore.set(fileId, uploadedFiles.get(fileId)!);
+                    this.send(ws, {
+                        type: 'upload_ok',
+                        fileId,
+                        fileName: msg.fileName,
+                        mimeType,
+                        message: `File uploaded (id: ${fileId}). Tell the AI: "I uploaded a file with id ${fileId}" to use it.`,
+                    });
+                    break;
+                }
+
                 case 'pop_history':
                     if (this.whatsapp && msg.chatId) {
                         const hist = this.whatsapp.getHistoryManagers().get(msg.chatId);
@@ -234,7 +301,7 @@ export class WebServer {
                     shouldStop = false;
 
                     try {
-                        await this.handleChat(ws, history, msg.message.trim(), () => shouldStop);
+                        await this.handleChat(ws, history, msg.message.trim(), () => shouldStop, lunarStudioTools);
                     } catch (err: any) {
                         logger.error(`Chat error: ${err.message}`);
                         this.send(ws, { type: 'error', message: err.message });
@@ -416,7 +483,8 @@ export class WebServer {
         ws: WebSocket,
         history: HistoryManager,
         userMessage: string,
-        isStopped: () => boolean
+        isStopped: () => boolean,
+        lunarStudioTools: Tool[] = []
     ) {
         const providerName = config.getProvider() || 'google';
         const apiKey = config.getApiKey(providerName);
@@ -440,7 +508,7 @@ export class WebServer {
         while (keepGenerating && !isStopped()) {
             keepGenerating = false;
 
-            const response = await llm.generate(history.getMessages(), tools);
+            const response = await llm.generate(history.getMessages(), [...tools, ...lunarStudioTools]);
             let content = response.content || '';
             content = this.memoryManager.parseAndSaveMemories(content, 'owner');
 
@@ -468,7 +536,7 @@ export class WebServer {
                         args: JSON.stringify(args),
                     });
 
-                    const tool = getTool(toolName);
+                    const tool = getTool(toolName) || lunarStudioTools.find((t: Tool) => t.name === toolName);
                     let result = 'Tool not found.';
 
                     if (tool) {

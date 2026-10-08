@@ -3,6 +3,7 @@ import { OpenAIProvider } from './openai.js';
 import { GoogleProvider } from './google.js';
 import { AntigravityProvider } from './antigravity.js';
 import { GroqProvider } from './groq.js';
+import { LlamaCppProvider } from './llama-cpp.js';
 
 export function createLLM(provider: string, apiKey: string, model?: string): LLMProvider {
     switch (provider) {
@@ -13,6 +14,8 @@ export function createLLM(provider: string, apiKey: string, model?: string): LLM
             return new GoogleProvider(apiKey, model);
         case 'groq':
             return new GroqProvider(apiKey, model);
+        case 'llama-cpp':
+            return new LlamaCppProvider(apiKey, model);
         case 'antigravity':
             return new AntigravityProvider(apiKey, model);
         default:

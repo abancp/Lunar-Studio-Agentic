@@ -6,14 +6,16 @@ interface ConfigSchema {
         google?: string;
         antigravity?: string;
         groq?: string;
+        'llama-cpp'?: string;
     };
     defaultModels: {
         openai?: string;
         google?: string;
         antigravity?: string;
         groq?: string;
+        'llama-cpp'?: string;
     };
-    provider?: 'openai' | 'google' | 'antigravity' | 'groq';
+    provider?: 'openai' | 'google' | 'antigravity' | 'groq' | 'llama-cpp';
     workspace?: string;
     whatsapp?: {
         enabled: boolean;
@@ -52,7 +54,7 @@ const config = new Conf<ConfigSchema>({
     },
 });
 
-export type Provider = 'openai' | 'google' | 'antigravity' | 'groq';
+export type Provider = 'openai' | 'google' | 'antigravity' | 'groq' | 'llama-cpp';
 
 export const getApiKey = (provider: Provider): string | undefined => {
     return config.get(`apiKeys.${provider}`);

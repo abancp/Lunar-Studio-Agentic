@@ -19,6 +19,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import type { ChatMessage, ToolCallInfo, AgentStatus } from '../hooks/useWebSocket';
+import { MediaMessage } from './MediaMessage';
 
 // ── Code block with copy button ──
 
@@ -248,6 +249,13 @@ function MessageBubble({ message }: { message: ChatMessage }) {
                         ) : (
                             <MarkdownContent content={message.content} />
                         )}
+                    </div>
+                )}
+
+                {/* File Attachment — shown inline */}
+                {message.fileAttachment && (
+                    <div className="mt-2">
+                        <MediaMessage file={message.fileAttachment} />
                     </div>
                 )}
 

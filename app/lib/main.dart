@@ -11,6 +11,7 @@ import 'widgets/main_panel.dart';
 import 'widgets/bottom_panel.dart';
 import 'widgets/placeholder_views.dart';
 import 'screens/settings_screen.dart';
+import 'widgets/file_message_bubble.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -124,54 +125,64 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: Builder(
           builder: (ctx) {
-            return Padding(
-              padding: const EdgeInsets.all(8),
-              child: Column(
-                children: [
-                  // Top Panel
-                  TopPanelWidget(
-                    isConnected: agent.isConnected,
-                    agentStatus: agent.agentStatus,
-                    onOpenSettings: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        fullscreenDialog: true,
-                        builder: (_) => const SettingsScreen(),
-                      ),
-                    ),
-                    onOpenSidebar: () {
-                      if (!isWide) {
-                        Scaffold.of(ctx).openDrawer();
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 8),
-
-                  // Body
-                  Expanded(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Sidebar — inline on wide screens
-                        if (isWide) ...[
-                          SizedBox(
-                            width: width >= 1024 ? 288 : 224,
-                            child: SidePanelWidget(
-                              agentStatus: agent.agentStatus,
-                              activePage: _activePage,
-                              onNavigate: _navigate,
-                            ),
+            return Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    children: [
+                      // Top Panel
+                      TopPanelWidget(
+                        isConnected: agent.isConnected,
+                        agentStatus: agent.agentStatus,
+                        onOpenSettings: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            fullscreenDialog: true,
+                            builder: (_) => const SettingsScreen(),
                           ),
-                          const SizedBox(width: 8),
-                        ],
+                        ),
+                        onOpenSidebar: () {
+                          if (!isWide) {
+                            Scaffold.of(ctx).openDrawer();
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 8),
 
-                        // Main Content
-                        Expanded(child: _buildPageContent(agent)),
-                      ],
-                    ),
+                      // Body
+                      Expanded(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Sidebar — inline on wide screens
+                            if (isWide) ...[
+                              SizedBox(
+                                width: width >= 1024 ? 288 : 224,
+                                child: SidePanelWidget(
+                                  agentStatus: agent.agentStatus,
+                                  activePage: _activePage,
+                                  onNavigate: _navigate,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                            ],
+
+                            // Main Content
+                            Expanded(child: _buildPageContent(agent)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+
+                // Notification toasts overlay
+                NotificationOverlay(
+                  notifications: agent.notifications,
+                  onDismiss: agent.dismissNotification,
+                ),
+              ],
             );
           },
         ),

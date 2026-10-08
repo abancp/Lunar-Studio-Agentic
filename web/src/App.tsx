@@ -9,6 +9,7 @@ import ToolsView from './components/ToolsView';
 import ContextView from './components/ContextView';
 import SettingsView from './components/SettingsView';
 import { useWebSocket, type NavPage } from './hooks/useWebSocket';
+import { X } from 'lucide-react';
 
 export default function App() {
   const ws = useWebSocket();
@@ -63,6 +64,7 @@ export default function App() {
               <BottomPanel
                 onSend={ws.sendMessage}
                 onStop={ws.stopGenerating}
+                onUpload={ws.uploadFile}
                 isGenerating={ws.isGenerating}
                 isConnected={ws.isConnected}
                 agentStatus={ws.agentStatus}
@@ -118,6 +120,36 @@ export default function App() {
         onRequestConfig={ws.requestConfig}
         onUpdateConfig={ws.updateConfig}
       />
+
+      {/* Notification Toasts */}
+      <div className="fixed top-4 right-4 z-[200] flex flex-col gap-2 pointer-events-none">
+        {ws.notifications.map(n => {
+          const colors: Record<string, string> = {
+            info: 'border-accent-secondary/30 bg-accent-secondary/10 text-accent-secondary',
+            success: 'border-success/30 bg-success/10 text-success',
+            warning: 'border-warning/30 bg-warning/10 text-warning',
+            error: 'border-danger/30 bg-danger/10 text-danger',
+          };
+          const c = colors[n.notifyType] || colors.info;
+          return (
+            <div
+              key={n.id}
+              className={`flex items-start gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-lg pointer-events-auto max-w-[320px] animate-fade-in ${c}`}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{n.title}</p>
+                <p className="text-xs opacity-80 mt-0.5 line-clamp-2">{n.body}</p>
+              </div>
+              <button
+                onClick={() => ws.dismissNotification(n.id)}
+                className="shrink-0 p-0.5 rounded hover:bg-white/10 cursor-pointer"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

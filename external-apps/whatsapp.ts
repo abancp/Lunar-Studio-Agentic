@@ -196,10 +196,10 @@ export class WhatsAppService {
             if (messageTs > 100000000000) {
                 messageTs = Math.floor(messageTs / 1000);
             }
-            if (messageTs < this.startTime) {
-                logger.warn(`Ignoring old message from ${msg.from} (ts: ${messageTs}, start: ${this.startTime})`);
-                return;
-            }
+            // if (messageTs < this.startTime) {
+            // logger.warn(`Ignoring old message from ${msg.from} (ts: ${messageTs}, start: ${this.startTime})`);
+            // return;
+            // }
         } else {
             logger.warn(`Message from ${msg.from} has no valid timestamp (${msg.timestamp}). Processing anyway.`);
         }

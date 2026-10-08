@@ -16,6 +16,7 @@ export async function setupLLM() {
             { name: 'Google (Gemini)', value: 'google' },
             { name: 'Groq', value: 'groq' },
             { name: 'Antigravity', value: 'antigravity' },
+            { name: 'Llama-CPP (Local)', value: 'llama-cpp' },
         ],
         default: config.getProvider() || 'google',
     }) as config.Provider;
@@ -25,11 +26,14 @@ export async function setupLLM() {
     // -----------------------------
     // Step 2: API Key
     // -----------------------------
-    const apiKey = await password({
-        message: `Enter your ${provider} API Key:`,
-        validate: (input) =>
-            input.trim().length > 0 ? true : 'API Key is required.',
-    });
+    let apiKey = '';
+    if (provider !== 'llama-cpp') {
+        apiKey = await password({
+            message: `Enter your ${provider} API Key:`,
+            validate: (input) =>
+                input.trim().length > 0 ? true : 'API Key is required.',
+        });
+    }
 
     // -----------------------------
     // Step 3: Fetch Models
@@ -42,6 +46,7 @@ export async function setupLLM() {
         google: 'gemini-1.5-flash',
         groq: 'openai/gpt-oss-120b',
         antigravity: 'ag-model-1',
+        'llama-cpp': '',
     };
 
     console.log(
@@ -58,7 +63,13 @@ export async function setupLLM() {
         console.log(chalk.dim('Falling back to manual model entry.\n'));
     }
 
-    if (models.length > 0) {
+    if (provider === 'llama-cpp') {
+        model = await input({
+            message: `Enter absolute path to the local GGUF model:`,
+            default: model || defaultModels[provider],
+            validate: (input) => input.trim().length > 0 ? true : 'Model path is required for local llama-cpp.'
+        });
+    } else if (models.length > 0) {
         model = await select({
             message: `Select default model for ${provider}:`,
             choices: models.map((m) => ({ name: m, value: m })),

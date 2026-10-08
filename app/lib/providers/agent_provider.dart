@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -13,12 +14,14 @@ class AgentProvider extends ChangeNotifier {
   bool _isGenerating = false;
   AgentStatus? _agentStatus;
   final List<ChatMessage> _messages = [];
+  final List<AppNotification> _notifications = [];
   String _serverUrl = _kDefaultUrl;
 
   bool get isConnected => _isConnected;
   bool get isGenerating => _isGenerating;
   AgentStatus? get agentStatus => _agentStatus;
   List<ChatMessage> get messages => List.unmodifiable(_messages);
+  List<AppNotification> get notifications => List.unmodifiable(_notifications);
   String get serverUrl => _serverUrl;
 
   AgentProvider() {
@@ -54,7 +57,6 @@ class AgentProvider extends ChangeNotifier {
         onDone: _onDone,
         cancelOnError: false,
       );
-      // After connecting, request status (server sends 'welcome' first)
     } catch (e) {
       _isConnected = false;
       _channel = null;
@@ -70,7 +72,7 @@ class AgentProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Incoming messages — matching exact server protocol ──
+  // ── Incoming messages ──
 
   void _onData(dynamic data) {
     Map<String, dynamic> msg;
@@ -84,15 +86,12 @@ class AgentProvider extends ChangeNotifier {
     final now = _timeNow();
 
     switch (type) {
-      // Server says hello, now we are connected
       case 'welcome':
         _isConnected = true;
-        // Request current status
         _send({'type': 'get_status'});
         notifyListeners();
         break;
 
-      // Agent status (provider, model, tools, whatsapp)
       case 'status':
         _agentStatus = AgentStatus(
           provider: msg['provider'] as String? ?? '—',
@@ -104,27 +103,25 @@ class AgentProvider extends ChangeNotifier {
         notifyListeners();
         break;
 
-      // Streamed text from the assistant
       case 'text':
-        final content = msg['content'] as String? ?? '';
-        _appendAssistantText(content, now);
+        _appendAssistantText(msg['content'] as String? ?? '', now);
         break;
 
-      // Tool execution started
       case 'tool_start':
-        final name = msg['name'] as String? ?? 'tool';
-        final args = msg['args'] as String? ?? '';
-        _appendToolStart(name, args, now);
+        _appendToolStart(
+          msg['name'] as String? ?? 'tool',
+          msg['args'] as String? ?? '',
+          now,
+        );
         break;
 
-      // Tool finished
       case 'tool_result':
-        final name = msg['name'] as String? ?? '';
-        final result = msg['result'] as String? ?? '';
-        _updateToolResult(name, result);
+        _updateToolResult(
+          msg['name'] as String? ?? '',
+          msg['result'] as String? ?? '',
+        );
         break;
 
-      // Turn is done
       case 'done':
         _isGenerating = false;
         notifyListeners();
@@ -141,19 +138,106 @@ class AgentProvider extends ChangeNotifier {
         notifyListeners();
         break;
 
-      // Logs, memories etc. — ignored for now
+      // ── File sent by the AI ──
+      case 'file':
+        _handleIncomingFile(msg, now);
+        break;
+
+      // ── Toast notification from AI ──
+      case 'notify':
+        final notifId = 'notif-${DateTime.now().millisecondsSinceEpoch}';
+        final notif = AppNotification(
+          id: notifId,
+          title: msg['title'] as String? ?? '',
+          body: msg['body'] as String? ?? '',
+          notifyType: msg['notifyType'] as String? ?? 'info',
+        );
+        _notifications.add(notif);
+        notifyListeners();
+        // Auto-dismiss after 5 seconds
+        Future.delayed(const Duration(seconds: 5), () {
+          dismissNotification(notifId);
+        });
+        break;
+
+      // ── File upload confirmed by server ──
+      case 'upload_ok':
+        _messages.add(ChatMessage(
+          id: 'upload-${DateTime.now().millisecondsSinceEpoch}',
+          role: MessageRole.assistant,
+          content:
+              '📎 **${msg['fileName']}** uploaded (id: `${msg['fileId']}`). You can now ask me about this file.',
+          timestamp: now,
+        ));
+        notifyListeners();
+        break;
+
       default:
         break;
     }
   }
 
+  void _handleIncomingFile(Map<String, dynamic> msg, String now) {
+    final fileName = msg['fileName'] as String? ?? 'file';
+    final mimeType = msg['mimeType'] as String? ?? 'application/octet-stream';
+    final base64Data = msg['data'] as String? ?? '';
+    final caption = msg['caption'] as String?;
+    final forceDownload = msg['forceDownload'] as bool? ?? false;
+    final sizeBytes = msg['sizeBytes'] as int?;
+
+    Uint8List bytes;
+    try {
+      bytes = base64Decode(base64Data);
+    } catch (_) {
+      bytes = Uint8List(0);
+    }
+
+    final attachment = FileAttachment(
+      fileName: fileName,
+      mimeType: mimeType,
+      bytes: bytes,
+      caption: caption,
+      forceDownload: forceDownload,
+      sizeBytes: sizeBytes,
+    );
+
+    _messages.add(ChatMessage(
+      id: 'file-${DateTime.now().millisecondsSinceEpoch}',
+      role: MessageRole.assistant,
+      content: '',
+      timestamp: now,
+      fileAttachment: attachment,
+    ));
+    notifyListeners();
+  }
+
+  void dismissNotification(String id) {
+    _notifications.removeWhere((n) => n.id == id);
+    notifyListeners();
+  }
+
+  // ── Upload a file to server ──
+
+  Future<void> uploadFile(
+      String fileName, String mimeType, Uint8List bytes) async {
+    if (!_isConnected) return;
+    final base64Data = base64Encode(bytes);
+    _send({
+      'type': 'upload_file',
+      'fileName': fileName,
+      'mimeType': mimeType,
+      'data': base64Data,
+    });
+  }
+
+  // ── Assistant message helpers ──
+
   void _appendAssistantText(String content, String now) {
-    // Find the last assistant message that has no text yet (only tool calls)
     if (_messages.isNotEmpty) {
       final last = _messages.last;
       if (last.role == MessageRole.assistant &&
           last.content.isEmpty &&
-          (last.toolCalls.isNotEmpty)) {
+          last.toolCalls.isNotEmpty) {
         _messages[_messages.length - 1] = ChatMessage(
           id: last.id,
           role: last.role,
@@ -180,7 +264,6 @@ class AgentProvider extends ChangeNotifier {
       args: args,
       status: ToolStatus.running,
     );
-
     if (_messages.isNotEmpty && _messages.last.role == MessageRole.assistant) {
       final last = _messages.last;
       _messages[_messages.length - 1] = ChatMessage(
@@ -235,7 +318,6 @@ class AgentProvider extends ChangeNotifier {
     _isGenerating = false;
     _channel = null;
     notifyListeners();
-    // Auto-reconnect after 3s
     Future.delayed(const Duration(seconds: 3), connect);
   }
 
@@ -244,11 +326,8 @@ class AgentProvider extends ChangeNotifier {
     _isGenerating = false;
     _channel = null;
     notifyListeners();
-    // Auto-reconnect after 3s
     Future.delayed(const Duration(seconds: 3), connect);
   }
-
-  // ── Send ──
 
   void _send(Map<String, dynamic> payload) {
     _channel?.sink.add(jsonEncode(payload));
